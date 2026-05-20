@@ -43,6 +43,7 @@ const BLOOM_COMPARISON_FAR_THRESHOLD = 0.95;
 let scene, camera, renderer, controls, gui;
 let sun, starfield;
 let composer, bloomPass;
+let scaleController = null; // lil-gui controller for the Stellar Visual Scale slider
 let clock, timeSpeed = 1.0;
 // Accumulator for simulated shader time. Decouples shader animation from
 // timeSpeed changes (slider drags) — using clock.getElapsedTime() * timeSpeed
@@ -299,7 +300,7 @@ function setupGUI() {
 
   // Dynamics & Pulsation Folder
   const fDynamics = gui.addFolder('5. Dynamics & Pulsation');
-  fDynamics.add(sun.params, 'scale', 0.1, 3.0, 0.05).name('Stellar Visual Scale').onChange(() => {
+  scaleController = fDynamics.add(sun.params, 'scale', 0.1, 3.0, 0.05).name('Stellar Visual Scale').onChange(() => {
     onGUIParameterChange();
     const star = (isComparisonMode && activeFocusedStar) ? activeFocusedStar : sun;
     controls.minDistance = 140.0 * star.params.scale;
@@ -332,6 +333,11 @@ function enterComparisonMode() {
     textContent: hudStarClass.textContent,
     className: hudStarClass.className
   };
+
+  // Disable scale slider — updateComparisonLayout enforces a fixed scale per star
+  // (visualScaleDefault for log mode, params.radius for linear), so dragging the
+  // scale would be immediately overwritten. Lock the control to communicate that.
+  if (scaleController) scaleController.disable();
   
   // Set camera limits and far plane for huge Universe Sandbox scales
   controls.maxDistance = 20000000.0;
@@ -498,6 +504,10 @@ function exitComparisonMode() {
     hudStarClass.textContent = mainSunHUDBackup.textContent;
     hudStarClass.className = mainSunHUDBackup.className;
   }
+
+  // Re-enable the scale slider — it was disabled on enter because the comparison
+  // layout overrides per-star scale.
+  if (scaleController) scaleController.enable();
 
   // Reset focus button active states
   document.querySelectorAll('.focus-star-btn').forEach(b => b.classList.remove('active'));
