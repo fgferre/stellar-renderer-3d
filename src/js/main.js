@@ -595,10 +595,16 @@ function updateComparisonLayout() {
 }
 
 function updateComparisonLensFlares() {
+  // Visibility-only update: only the focused star shows flares, and only if the user
+  // has flares enabled globally. We do NOT mutate per-star params.lensFlaresEnabled
+  // (preserves the toggle as user intent) and do NOT call updateLensFlares (avoids
+  // teardown/rebuild of 3 CanvasTextures per star on every focus change — known
+  // perf bottleneck flagged in CONCERNS.md). Tradeoff: all 12 stars keep their
+  // ~3MB texture set loaded in comparison mode (~36MB total) vs. instant focus changes.
   comparisonStars.forEach(star => {
+    if (!star.flareGroup) return;
     const isFocused = (star === activeFocusedStar);
-    star.params.lensFlaresEnabled = isFocused && sun.params.lensFlaresEnabled;
-    star.updateLensFlares();
+    star.flareGroup.visible = isFocused && sun.params.lensFlaresEnabled;
   });
 }
 
@@ -1035,15 +1041,15 @@ function updateAutoExposure(distance) {
     }
   }
 
-  // Disable flares if we are very close to avoid blocking screen space with giant sprites
+  // Runtime visibility culling: hide flares when camera is very close (giant sprites would
+  // dominate the viewport). User preference (params.lensFlaresEnabled, toggled via GUI) is
+  // the ceiling; proximity can only hide, never re-enable against the user's wish.
+  // Uses flareGroup.visible (cheap) instead of mutating params + recreating textures
+  // (expensive, and would clobber the user's preference on the next zoom-in/zoom-out cycle).
   const flareThreshold = 170.0 * scale;
-  if (distance < flareThreshold && star.params.lensFlaresEnabled) {
-    star.params.lensFlaresEnabled = false;
-    star.updateLensFlares();
-  } else if (distance >= flareThreshold && !star.params.lensFlaresEnabled && sun.params.lensFlaresEnabled) {
-    // Re-enable lens flares for any star type once camera is at safe distance
-    star.params.lensFlaresEnabled = true;
-    star.updateLensFlares();
+  if (star.flareGroup) {
+    const tooClose = distance < flareThreshold;
+    star.flareGroup.visible = star.params.lensFlaresEnabled && !tooClose;
   }
 }
 
