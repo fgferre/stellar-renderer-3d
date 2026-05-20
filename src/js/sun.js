@@ -307,13 +307,13 @@ export class Sun {
   }
 
   // Update uniforms in frame render loop
-  update(time, bloomStrength = 1.0) {
+  update(time) {
     // Core surface time
     this.coreMaterial.uniforms.uTime.value = time;
-    
+
     // Prominences time
     this.promMaterial.uniforms.uTime.value = time;
-    
+
     // Corona time
     this.coronaMaterial.uniforms.uTime.value = time;
 
@@ -328,7 +328,7 @@ export class Sun {
       // Modulate scale by a slow sine wave
       const breath = 1.0 + this.params.pulseAmplitude * Math.sin(time * this.params.pulseFrequency);
       currentScale *= breath;
-      
+
       // Also slightly modulate surface temperatures to simulate heat pulse!
       const tempFactor = 1.0 - (this.params.pulseAmplitude * 0.5) * Math.sin(time * this.params.pulseFrequency);
       this.coreMaterial.uniforms.uHighTemp.value = this.params.highTemp * tempFactor;
@@ -339,10 +339,8 @@ export class Sun {
       this.coreMaterial.uniforms.uLowTemp.value = this.params.lowTemp;
     }
     this.group.scale.set(currentScale, currentScale * oblateness, currentScale);
-    
-    // Dynamically adjust corona density and lens flare scale based on bloom
-    // If the bloom is stronger, the corona spreads wider!
-    const sizeUniform = this.coronaMaterial.uniforms.uScale.value;
+
+    // Subtle corona breathing
     const pulseScale = 1.0 + 0.02 * Math.sin(time * 0.8);
     this.coronaMesh.scale.set(pulseScale, pulseScale, pulseScale);
   }

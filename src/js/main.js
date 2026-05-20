@@ -1193,10 +1193,10 @@ function animate() {
     }
 
     comparisonStars.forEach(star => {
-      star.update(elapsed, bloomPass.strength);
+      star.update(elapsed);
     });
   } else {
-    sun.update(elapsed, bloomPass.strength);
+    sun.update(elapsed);
   }
   if (starfield) {
     starfield.material.uniforms.uTime.value = elapsed;
