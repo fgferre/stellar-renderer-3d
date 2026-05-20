@@ -384,7 +384,8 @@ void main() {
   float loopAlpha = smoothstep(0.45, 0.72, loops);
 
   // Fade out opacity at the peak of the prominence
-  float heightFade = smoothstep(max(0.0001, uProminenceHeight * 1.5), 0.0, vDisplacement);
+  // Use ascending edges + invert: GLSL ES spec leaves edge0 >= edge1 undefined
+  float heightFade = 1.0 - smoothstep(0.0, max(0.0001, uProminenceHeight * 1.5), vDisplacement);
   
   // Edge opacity falloff (Fades out when looking straight-on, highlighting prominences on solar limb)
   vec3 viewDir = vec3(0.0, 0.0, 1.0);
@@ -392,7 +393,8 @@ void main() {
   float edgeOpacity = pow(edgeGlow, uEdgeFade);
 
   // Blend prominence loops with polar jet columns
-  float jetAlpha = smoothstep(1.2, 0.0, heightFade) * 0.85;
+  // Use ascending edges + invert: GLSL ES spec leaves edge0 >= edge1 undefined
+  float jetAlpha = (1.0 - smoothstep(0.0, 1.2, heightFade)) * 0.85;
   float alphaBlend = mix(loopAlpha * heightFade, jetAlpha, vPolarFactor * clamp(uPolarJetIntensity, 0.0, 1.0));
   float finalAlpha = alphaBlend * edgeOpacity;
   
@@ -535,7 +537,8 @@ void main() {
   float twinkle = 0.35 + 0.65 * sin(uTime * freq + vPhase);
   
   // Cutoff at particle borders to prevent square edge artifacts
-  glow *= smoothstep(0.5, 0.2, dist);
+  // Use ascending edges + invert: GLSL ES spec leaves edge0 >= edge1 undefined
+  glow *= 1.0 - smoothstep(0.2, 0.5, dist);
   
   if (glow < 0.01) discard;
 
