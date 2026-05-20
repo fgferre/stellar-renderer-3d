@@ -72,6 +72,8 @@ let comparisonStars = [];
 let activeFocusedStar = null;
 let comparisonScaleMode = 'visual'; // 'visual' (logarithmic) or 'real' (linear)
 let mainSunParamsBackup = null; // Backup for main sun's parameters
+let mainSunPresetBackup = null; // Backup for sun.currentPresetName so exit restores the user's prior preset
+let mainSunHUDBackup = null;    // Backup for HUD class label { textContent, className }
 
 // Cinematic Flyby States
 let isCinematicMode = false;
@@ -325,6 +327,11 @@ function enterComparisonMode() {
   // Backup main sun's parameters to prevent mutation leaks
   mainSunParamsBackup = {};
   sun.copyParams(sun.params, mainSunParamsBackup);
+  mainSunPresetBackup = sun.currentPresetName;
+  mainSunHUDBackup = {
+    textContent: hudStarClass.textContent,
+    className: hudStarClass.className
+  };
   
   // Set camera limits and far plane for huge Universe Sandbox scales
   controls.maxDistance = 20000000.0;
@@ -438,23 +445,29 @@ function exitComparisonMode() {
   // Restore main sun's parameters and re-apply them to clear visual leaks
   if (mainSunParamsBackup) {
     sun.copyParams(mainSunParamsBackup, sun.params);
+    if (mainSunPresetBackup) {
+      sun.currentPresetName = mainSunPresetBackup;
+    }
     sun.applyCurrentParams();
   }
-  
+
   // Restore camera defaults
   controls.maxDistance = 150000.0;
   camera.far = 500000.0;
   camera.updateProjectionMatrix();
-  
+
   if (comparisonGroup) {
     comparisonGroup.visible = false;
   }
-  
+
   sun.group.visible = true;
-  
-  // Restore preset Sol active state
+
+  // Restore the preset button matching whatever was active before entering comparison.
+  // Custom/catalog stars (currentPresetName === 'custom') have no preset button — leave
+  // all unhighlighted in that case, matching the state from the custom-class flow.
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('btn-preset-sol').classList.add('active');
+  const restoredBtn = document.querySelector(`.preset-btn[data-preset="${sun.currentPresetName}"]`);
+  if (restoredBtn) restoredBtn.classList.add('active');
   
   // Hide comparison panels
   document.getElementById('comparison-focus-panel').style.display = 'none';
@@ -479,9 +492,12 @@ function exitComparisonMode() {
   flightTargetLookAt.set(0, 0, 0);
   flightTargetPos.set(0, 180 * sun.params.scale, 550 * sun.params.scale);
 
-  // Restore HUD title
-  hudStarClass.className = 'reading-value yellow-dwarf';
-  hudStarClass.textContent = 'G2V (Sol)';
+  // Restore HUD label snapshot taken on enter (matches whatever the user had active —
+  // standard preset text, custom MK input, or HYG catalog name)
+  if (mainSunHUDBackup) {
+    hudStarClass.textContent = mainSunHUDBackup.textContent;
+    hudStarClass.className = mainSunHUDBackup.className;
+  }
 
   // Reset focus button active states
   document.querySelectorAll('.focus-star-btn').forEach(b => b.classList.remove('active'));
