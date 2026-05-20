@@ -526,12 +526,28 @@ html, body {
     max-height: 220px;
     overflow-y: auto;
   }
-  
+
   #control-panel {
     top: 20px;
     right: 20px;
     width: calc(100% - 40px);
     max-height: 220px;
+    overflow-y: auto;
+  }
+}
+
+/* Landscape phones (~360-500px tall) cannot fit two 220px panels + margins,
+   so the HUD overlaps the control panel and obscures the canvas entirely. Cap
+   each panel at ~38vh and force internal scroll so the user can still see the
+   star between them. */
+@media (max-height: 500px) and (orientation: landscape) {
+  #space-hud {
+    max-height: 38vh;
+    overflow-y: auto;
+  }
+  #control-panel {
+    max-height: 38vh;
+    overflow-y: auto;
   }
 }
 
