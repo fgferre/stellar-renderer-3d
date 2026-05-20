@@ -178,8 +178,6 @@ export class Sun {
       fragmentShader: surfaceFragmentShader,
       uniforms: {
         uTime: { value: 0 },
-        uHighTemp: { value: this.params.highTemp },
-        uLowTemp: { value: this.params.lowTemp },
         uNoiseScale: { value: this.params.noiseScale },
         uConvectionSpeed: { value: this.params.convectionSpeed },
         uSunspotThreshold: { value: this.params.sunspotThreshold },
@@ -230,7 +228,6 @@ export class Sun {
       vertexShader: coronaVertexShader,
       fragmentShader: coronaFragmentShader,
       uniforms: {
-        uScale: { value: coronaSize },
         uTemp: { value: this.params.highTemp },
         uTime: { value: 0 },
         uCoronaSpeed: { value: this.params.coronaSpeed },
@@ -333,15 +330,6 @@ export class Sun {
       // Modulate scale by a slow sine wave
       const breath = 1.0 + this.params.pulseAmplitude * Math.sin(time * this.params.pulseFrequency);
       currentScale *= breath;
-
-      // Also slightly modulate surface temperatures to simulate heat pulse!
-      const tempFactor = 1.0 - (this.params.pulseAmplitude * 0.5) * Math.sin(time * this.params.pulseFrequency);
-      this.coreMaterial.uniforms.uHighTemp.value = this.params.highTemp * tempFactor;
-      this.coreMaterial.uniforms.uLowTemp.value = this.params.lowTemp * tempFactor;
-    } else {
-      // Reset temperatures in case they were modified by previous pulsation presets
-      this.coreMaterial.uniforms.uHighTemp.value = this.params.highTemp;
-      this.coreMaterial.uniforms.uLowTemp.value = this.params.lowTemp;
     }
     this.group.scale.set(currentScale, currentScale * oblateness, currentScale);
 
@@ -470,8 +458,6 @@ export class Sun {
     const oblateness = this.params.oblateness !== undefined ? this.params.oblateness : 1.0;
     this.group.scale.set(this.params.scale, this.params.scale * oblateness, this.params.scale);
 
-    this.coreMaterial.uniforms.uHighTemp.value = this.params.highTemp;
-    this.coreMaterial.uniforms.uLowTemp.value = this.params.lowTemp;
     this.coreMaterial.uniforms.uNoiseScale.value = this.params.noiseScale;
     this.coreMaterial.uniforms.uConvectionSpeed.value = this.params.convectionSpeed;
     this.coreMaterial.uniforms.uSunspotThreshold.value = this.params.sunspotThreshold;

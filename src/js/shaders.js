@@ -180,8 +180,6 @@ float warpedFbm3D(vec3 p) {
 
 // 1. Solar Surface (Core) Shaders
 export const surfaceVertexShader = `
-uniform float uTime;
-uniform float uNoiseScale;
 varying vec3 vPosition;
 varying vec3 vNormal;
 varying vec3 vViewDir;
@@ -189,18 +187,16 @@ varying vec3 vViewDir;
 void main() {
   vPosition = position;
   vNormal = normalize(normalMatrix * normal);
-  
+
   vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
   vViewDir = normalize(-mvPosition.xyz);
-  
+
   gl_Position = projectionMatrix * mvPosition;
 }
 `;
 
 export const surfaceFragmentShader = `
 uniform float uTime;
-uniform float uHighTemp;
-uniform float uLowTemp;
 uniform float uNoiseScale;
 uniform float uConvectionSpeed;
 uniform float uSunspotThreshold;
@@ -415,24 +411,22 @@ void main() {
 
 // 3. Volumetric Corona Glow Shaders
 export const coronaVertexShader = `
-uniform float uScale;
 varying vec2 vUv;
 
 void main() {
   vUv = uv;
-  
+
   // Camera facing billboard matrix transformation with scale preservation
   vec3 cameraSpaceCenter = (modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
   float scaleX = length(modelViewMatrix[0].xyz);
   float scaleY = length(modelViewMatrix[1].xyz);
   vec3 cameraSpacePos = cameraSpaceCenter + vec3(position.x * scaleX, position.y * scaleY, 0.0);
-  
+
   gl_Position = projectionMatrix * vec4(cameraSpacePos, 1.0);
 }
 `;
 
 export const coronaFragmentShader = `
-uniform float uScale;
 uniform float uTemp;
 uniform float uTime;
 uniform float uCoronaSpeed;
