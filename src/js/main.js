@@ -26,6 +26,20 @@ const EARTH_ORBITAL_VELOCITY_KMS = 29.78;
 // readout: T = K * L^0.25 / sqrt(d_AU).
 const EARTH_EQUILIBRIUM_TEMP_K = 278.0;
 
+// Bloom envelope — interpolates between "near star" (camera close, dNorm=0)
+// and "far star" (camera at the auto-exposure outer bound, dNorm=1). In single
+// star mode the far ceiling is intentionally dramatic (AAA glare). In Comparison
+// Mode it would amplify additive corona/surface overlap when multiple stars
+// stack in screen space, so the far ceiling is reduced and the threshold raised
+// — bloom is throttled but not removed, preserving glow without blowing out the
+// composite. Single-star rendering is unaffected.
+const BLOOM_NEAR_STRENGTH = 0.15;
+const BLOOM_SINGLE_FAR_STRENGTH = 0.75;
+const BLOOM_COMPARISON_FAR_STRENGTH = 0.35;
+const BLOOM_NEAR_THRESHOLD = 0.90;
+const BLOOM_SINGLE_FAR_THRESHOLD = 0.78;
+const BLOOM_COMPARISON_FAR_THRESHOLD = 0.95;
+
 let scene, camera, renderer, controls, gui;
 let sun, starfield;
 let composer, bloomPass;
@@ -1034,6 +1048,19 @@ function updateGUIDisplay() {
   }
 }
 
+// Resolve bloom envelope targets for the current frame. Reads isComparisonMode
+// from module scope to pick between the dramatic single-star ceiling and the
+// throttled comparison-mode ceiling (prevents additive corona overlap from
+// blowing out the composite when multiple stars stack in screen space).
+function getBloomTargets(dNorm) {
+  const farStrength = isComparisonMode ? BLOOM_COMPARISON_FAR_STRENGTH : BLOOM_SINGLE_FAR_STRENGTH;
+  const farThreshold = isComparisonMode ? BLOOM_COMPARISON_FAR_THRESHOLD : BLOOM_SINGLE_FAR_THRESHOLD;
+  return {
+    strength: THREE.MathUtils.lerp(BLOOM_NEAR_STRENGTH, farStrength, dNorm),
+    threshold: THREE.MathUtils.lerp(BLOOM_NEAR_THRESHOLD, farThreshold, dNorm)
+  };
+}
+
 // Dynamic camera auto-exposure system (mimics eyes adapting to sunlight)
 function updateAutoExposure(distance) {
   const star = (isComparisonMode && activeFocusedStar) ? activeFocusedStar : sun;
@@ -1052,8 +1079,7 @@ function updateAutoExposure(distance) {
 
   if (bloomPass) {
     if (usePostProcessing) {
-      const targetBloomStrength = THREE.MathUtils.lerp(0.15, 0.75, dNorm);
-      const targetBloomThreshold = THREE.MathUtils.lerp(0.9, 0.78, dNorm);
+      const { strength: targetBloomStrength, threshold: targetBloomThreshold } = getBloomTargets(dNorm);
       bloomPass.strength = THREE.MathUtils.lerp(bloomPass.strength, targetBloomStrength, 0.08);
       bloomPass.threshold = THREE.MathUtils.lerp(bloomPass.threshold, targetBloomThreshold, 0.08);
     } else {
