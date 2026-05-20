@@ -65,6 +65,9 @@ export function parseMKClassification(spectralString) {
   if (specClass.startsWith('D')) {
     lumClass = 'VII';
   }
+
+  // Supergiant check: starts with 'I' but does not start with 'II', 'III', or 'IV'
+  const isSupergiant = lumClass.startsWith('I') && !lumClass.startsWith('II') && !lumClass.startsWith('III') && !lumClass.startsWith('IV');
   
   // 1. Calculate base temperature based on spectral class and subclass
   let baseTemp = 5800;
@@ -113,7 +116,7 @@ export function parseMKClassification(spectralString) {
   mass = Math.max(0.08, mass);
 
   // Apply mass scaling factor for giants and supergiants
-  if (lumClass.startsWith('I')) {
+  if (isSupergiant) {
     mass = Math.max(20.0, mass * 2.0); // Supergiants are highly massive
   } else if (lumClass === 'III') {
     mass = Math.max(1.5, mass * 1.2); // Giants
@@ -121,7 +124,7 @@ export function parseMKClassification(spectralString) {
 
   // Calculate Luminosity based on mass-luminosity relation (L = M^3.5)
   let starLum = Math.pow(mass, 3.5);
-  if (lumClass.startsWith('I')) {
+  if (isSupergiant) {
     starLum = Math.max(15000.0, Math.pow(mass, 3.8) * 15.0);
   } else if (lumClass === 'III') {
     starLum = Math.max(50.0, Math.pow(mass, 3.5) * 5.0);
@@ -137,7 +140,7 @@ export function parseMKClassification(spectralString) {
   let vRot = 2.0;
   if (lumClass === 'VII' || specClass.startsWith('D')) {
     vRot = 20.0;
-  } else if (lumClass.startsWith('I')) {
+  } else if (isSupergiant) {
     vRot = (specClass === 'O' || specClass === 'B') ? 45.0 : 5.0;
   } else if (lumClass === 'III') {
     vRot = 12.0;
@@ -194,7 +197,7 @@ export function parseMKClassification(spectralString) {
   let pulseFrequency = 0.0;
   
   // Adjust based on Luminosity Class (Scale, Gravity, Turbulence, Rotation, Pulsation)
-  if (lumClass.startsWith('I')) {
+  if (isSupergiant) {
     // Supergiants: Massive size, lower surface gravity (slow convective cells, large loops)
     scale = 2.4;
     convectionSpeed = (specClass === 'O' || specClass === 'B') ? 0.45 : 0.06;
@@ -315,7 +318,11 @@ export function parseMKClassification(spectralString) {
     polarJetIntensity,
     // Pulsation parameters
     pulseAmplitude,
-    pulseFrequency
+    pulseFrequency,
+    // Classification Metadata
+    specClass,
+    lumClass,
+    spect: cleanStr
   };
 }
 

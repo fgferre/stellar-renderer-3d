@@ -337,6 +337,7 @@ function enterComparisonMode() {
         star.setPreset(starSettings);
       }
       star.displayName = data.name;
+      star.visualScaleDefault = star.params.scale;
       comparisonStars.push(star);
     });
   }
@@ -505,8 +506,12 @@ function updateComparisonLayout() {
   if (comparisonScaleMode === 'visual') {
     let accumulatedX = 0;
     comparisonStars.forEach((star, index) => {
-      const defaults = star.getPresetDefaultSettings(star.currentPresetName);
-      star.params.scale = defaults.scale;
+      if (star.visualScaleDefault !== undefined) {
+        star.params.scale = star.visualScaleDefault;
+      } else {
+        const defaults = star.getPresetDefaultSettings(star.currentPresetName);
+        star.params.scale = defaults.scale;
+      }
       star.applyCurrentParams();
 
       const renderingRadius = 100.0 * star.params.scale;
