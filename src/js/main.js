@@ -456,6 +456,34 @@ function exitComparisonMode() {
   updatePhysicalHUD();
 }
 
+// Map a star's parsed spectral class to a CSS class on the HUD star-class readout.
+// Source of truth is star.params.specClass (exposed by parseMKClassification and
+// preserved through HYG overrides). Replaces fragile displayName.includes() chains.
+//
+// Class buckets:
+//   O, B           -> 'blue-super'    (hot, blue main-sequence and supergiants)
+//   A, F, D*       -> 'white-dwarf'   (A/F main-sequence appear white; D = degenerate WDs)
+//   G              -> 'yellow-dwarf'  (Sun-like)
+//   K, M           -> 'red-giant'     (cool stars and most named red giants)
+//
+// NOTE: bucketing A/F into 'white-dwarf' is a CSS naming legacy from the existing
+// stylesheet — they are NOT actual white dwarfs. Revisit if the design system grows
+// dedicated 'white-main-sequence' or per-class accents.
+function applyHUDClassForStar(star) {
+  hudStarClass.className = 'reading-value';
+  const specClass = star && star.params ? star.params.specClass : null;
+  if (!specClass) return;
+  if (specClass === 'O' || specClass === 'B') {
+    hudStarClass.classList.add('blue-super');
+  } else if (specClass === 'A' || specClass === 'F' || specClass.startsWith('D')) {
+    hudStarClass.classList.add('white-dwarf');
+  } else if (specClass === 'G') {
+    hudStarClass.classList.add('yellow-dwarf');
+  } else if (specClass === 'K' || specClass === 'M') {
+    hudStarClass.classList.add('red-giant');
+  }
+}
+
 function focusOnComparisonStar(index) {
   if (!isComparisonMode || index < 0 || index >= comparisonStars.length) return;
 
@@ -480,18 +508,9 @@ function focusOnComparisonStar(index) {
   flightTargetLookAt.set(starX, 0, 0);
   flightTargetPos.set(starX, 180 * starScale, 550 * starScale);
 
-  // Update HUD telemetry title class code
-  hudStarClass.className = 'reading-value';
+  // Update HUD telemetry title class code (from spectral classification, not name)
+  applyHUDClassForStar(star);
   hudStarClass.textContent = star.displayName;
-  if (star.displayName.includes("Sol") || star.displayName.includes("Sun")) {
-    hudStarClass.classList.add('yellow-dwarf');
-  } else if (star.displayName.includes("Arcturus") || star.displayName.includes("Aldebaran") || star.displayName.includes("Antares") || star.displayName.includes("Betelgeuse") || star.displayName.includes("UY Scuti") || star.displayName.includes("Red")) {
-    hudStarClass.classList.add('red-giant');
-  } else if (star.displayName.includes("Rigel") || star.displayName.includes("Deneb") || star.displayName.includes("Vega") || star.displayName.includes("Sirius A") || star.displayName.includes("Blue")) {
-    hudStarClass.classList.add('blue-super');
-  } else {
-    hudStarClass.classList.add('white-dwarf');
-  }
 
   updateGUIDisplay();
   updatePhysicalHUD();
@@ -920,24 +939,11 @@ function setupHUDBindings() {
     // Refresh GUI sliders
     updateGUIDisplay();
     
-    // Update HUD telemetry visuals based on custom stellar class
-    hudStarClass.className = 'reading-value'; // Reset
-    
+    // Update HUD telemetry visuals based on parsed spectral class (always present on
+    // both HYG lookups and raw MK parses since parseMKClassification exposes it)
+    applyHUDClassForStar(sun);
     const cleanStr = rawVal.toUpperCase().replace(/\s+/g, '');
-    const spectSignature = isHYG ? settings.displayName : cleanStr;
-    const prefix = isHYG ? settings.displayName.split('(')[1][0] : cleanStr[0];
-    
-    if (prefix === 'O' || prefix === 'B') {
-      hudStarClass.classList.add('blue-super');
-    } else if (prefix === 'A' || prefix === 'F' || (isHYG ? settings.displayName.includes('(D') : cleanStr.startsWith('D'))) {
-      hudStarClass.classList.add('white-dwarf');
-    } else if (prefix === 'G') {
-      hudStarClass.classList.add('yellow-dwarf');
-    } else if (prefix === 'K' || prefix === 'M') {
-      hudStarClass.classList.add('red-giant');
-    }
-    
-    hudStarClass.textContent = spectSignature;
+    hudStarClass.textContent = isHYG ? settings.displayName : cleanStr;
 
     // Update the physical parameters HUD panel
     updatePhysicalHUD();
