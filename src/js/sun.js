@@ -154,7 +154,12 @@ export class Sun {
     };
 
     this.currentPresetName = 'sol';
-    
+
+    // Snapshot of the most recently loaded catalog/MK seed (set by setPreset(object)).
+    // resetCurrentPresetToDefault uses this when currentPresetName === 'custom' so
+    // that Reset restores the user's chosen catalog star, not generic Sol defaults.
+    this.customSeed = null;
+
     // Maintain a single permanent object reference for GUI bindings
     this.params = this.getDefaultParams();
     this.copyParams(this.presetStates['sol'], this.params);
@@ -493,7 +498,14 @@ export class Sun {
 
   // Reset parameters in the active preset slot back to their preset defaults
   resetCurrentPresetToDefault() {
-    const defaults = this.getPresetDefaultSettings(this.currentPresetName);
+    let defaults;
+    if (this.currentPresetName === 'custom' && this.customSeed) {
+      // Catalog/MK custom presets have no case in getPresetDefaultSettings —
+      // restore from the seed cached at setPreset(object) time instead.
+      defaults = this.customSeed;
+    } else {
+      defaults = this.getPresetDefaultSettings(this.currentPresetName);
+    }
     this.copyParams(defaults, this.params);
     this.applyCurrentParams();
   }
@@ -508,14 +520,19 @@ export class Sun {
     if (typeof presetNameOrSettings === 'object') {
       // Direct custom settings object (transient custom class input from catalog)
       this.currentPresetName = 'custom';
-      
+
       // Initialize target with defaults to clean up parameter leaks
       const defaults = this.getDefaultParams();
       this.copyParams(defaults, this.params);
-      
+
       // Merge custom settings
       this.copyParams(presetNameOrSettings, this.params);
       this.applyCurrentParams();
+
+      // Snapshot the resolved seed (defaults + custom merged) so a subsequent
+      // Reset returns to this catalog star instead of falling through to Sol.
+      this.customSeed = {};
+      this.copyParams(this.params, this.customSeed);
     } else {
       const presetName = presetNameOrSettings;
       if (this.presetStates[presetName]) {
