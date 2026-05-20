@@ -62,49 +62,49 @@
 
       <!-- Quick presets panel inside the HUD -->
       <div class="hud-section-title">STELLAR CLASSIFICATION SELECTOR</div>
-      <div class="preset-buttons">
-        <button class="preset-btn active" data-preset="sol" id="btn-preset-sol">
+      <div class="preset-buttons" role="group" aria-label="Stellar classification presets">
+        <button class="preset-btn active" data-preset="sol" id="btn-preset-sol" aria-pressed="true">
           <span class="class-code">G2V</span>
           <span class="class-name">Yellow Dwarf (Sol)</span>
         </button>
-        <button class="preset-btn" data-preset="redgiant" id="btn-preset-red">
+        <button class="preset-btn" data-preset="redgiant" id="btn-preset-red" aria-pressed="false">
           <span class="class-code">M5III</span>
           <span class="class-name">Red Giant</span>
         </button>
-        <button class="preset-btn" data-preset="bluesuper" id="btn-preset-blue">
+        <button class="preset-btn" data-preset="bluesuper" id="btn-preset-blue" aria-pressed="false">
           <span class="class-code">O5I</span>
           <span class="class-name">Blue Supergiant</span>
         </button>
-        <button class="preset-btn" data-preset="whitedwarf" id="btn-preset-white">
+        <button class="preset-btn" data-preset="whitedwarf" id="btn-preset-white" aria-pressed="false">
           <span class="class-code">DA2</span>
           <span class="class-name">White Dwarf</span>
         </button>
       </div>
-      
+
       <!-- Custom Class Input -->
       <div class="custom-class-container" style="margin-top: 10px; display: flex; gap: 6px;">
-        <input type="text" id="input-custom-class" placeholder="ENTER MK CLASS (E.G. B1IA, K5III, O9V)" style="flex-grow: 1; background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 8px; color: #fff; font-family: 'Orbitron', sans-serif; font-size: 0.7rem; text-align: center; text-transform: uppercase; outline: none; transition: border-color 0.2s;" />
+        <input type="text" id="input-custom-class" aria-label="Morgan-Keenan stellar classification code" placeholder="ENTER MK CLASS (E.G. B1IA, K5III, O9V)" style="flex-grow: 1; background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 8px; color: #fff; font-family: 'Orbitron', sans-serif; font-size: 0.7rem; text-align: center; text-transform: uppercase; outline: none; transition: border-color 0.2s;" />
         <button id="btn-apply-custom-class" class="gen-btn" style="padding: 8px 12px; margin: 0; min-width: 80px; font-size: 0.65rem; border: 1px solid rgba(0, 168, 255, 0.4); background: rgba(0, 168, 255, 0.1); border-radius: 4px; color: #fff; font-family: 'Orbitron', sans-serif; cursor: pointer; transition: all 0.2s;">GENERATE</button>
       </div>
 
       <!-- Autopilot Flight System -->
       <div class="hud-section-title">FLIGHT AUTOPILOT NAVIGATION</div>
-      <div class="autopilot-buttons">
-        <button class="nav-btn" data-distance="far" id="btn-nav-far">SYSTEMIC VIEW (FAR)</button>
-        <button class="nav-btn" data-distance="orbit" id="btn-nav-orbit">STABLE ORBIT</button>
-        <button class="nav-btn warning" data-distance="close" id="btn-nav-close">SURFACE PROBE</button>
+      <div class="autopilot-buttons" role="group" aria-label="Camera autopilot distance presets">
+        <button class="nav-btn" data-distance="far" id="btn-nav-far" aria-pressed="false">SYSTEMIC VIEW (FAR)</button>
+        <button class="nav-btn" data-distance="orbit" id="btn-nav-orbit" aria-pressed="false">STABLE ORBIT</button>
+        <button class="nav-btn warning" data-distance="close" id="btn-nav-close" aria-pressed="false">SURFACE PROBE</button>
       </div>
 
       <!-- Comparison Mode Panel -->
       <div class="hud-section-title">STELLAR COMPARISON (UNIVERSE SANDBOX)</div>
       <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 5px;">
-        <button class="nav-btn" id="btn-comparison-mode" style="border: 1px solid rgba(0, 255, 128, 0.4); background: rgba(0, 255, 128, 0.1); color: #00ff80;">ENTER COMPARISON MODE</button>
-        
+        <button class="nav-btn" id="btn-comparison-mode" aria-pressed="false" style="border: 1px solid rgba(0, 255, 128, 0.4); background: rgba(0, 255, 128, 0.1); color: #00ff80;">ENTER COMPARISON MODE</button>
+
         <div id="comparison-scale-toggle-container" style="display: none; align-items: center; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.3); border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
           <span class="hud-label" style="font-size: 0.6rem; color: #aaa; margin: 0;">SCALE MODE:</span>
-          <div style="display: flex; gap: 4px;">
-            <button class="nav-btn active" id="btn-scale-visual" style="padding: 4px 8px; font-size: 0.55rem; margin: 0;">VISUAL (LOG)</button>
-            <button class="nav-btn" id="btn-scale-real" style="padding: 4px 8px; font-size: 0.55rem; margin: 0;">REAL (LIN)</button>
+          <div style="display: flex; gap: 4px;" role="group" aria-label="Comparison scale mode">
+            <button class="nav-btn active" id="btn-scale-visual" aria-pressed="true" style="padding: 4px 8px; font-size: 0.55rem; margin: 0;">VISUAL (LOG)</button>
+            <button class="nav-btn" id="btn-scale-real" aria-pressed="false" style="padding: 4px 8px; font-size: 0.55rem; margin: 0;">REAL (LIN)</button>
           </div>
         </div>
 
@@ -125,7 +125,7 @@
     <div id="control-panel">
       <div class="panel-header">
         <h2>STELLAR DIAGNOSTICS</h2>
-        <button id="toggle-panel" aria-label="Minimize Panel">—</button>
+        <button id="toggle-panel" aria-label="Minimize Panel" aria-expanded="true" aria-controls="gui-container">—</button>
       </div>
       <div id="gui-container">
         <!-- lil-gui will be mounted here dynamically -->

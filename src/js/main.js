@@ -196,6 +196,15 @@ function updateLoadProgress(pct) {
   }
 }
 
+// Mirror the visual .active state onto aria-pressed for every button that
+// declared aria-pressed in HTML (or had it added at creation time). Called
+// after any block that mutates .active so screen readers stay in sync.
+function syncAriaPressed() {
+  document.querySelectorAll('button[aria-pressed]').forEach(btn => {
+    btn.setAttribute('aria-pressed', btn.classList.contains('active') ? 'true' : 'false');
+  });
+}
+
 // Handle updates to star parameters from the GUI control panel
 function onGUIParameterChange() {
   const star = (isComparisonMode && activeFocusedStar) ? activeFocusedStar : sun;
@@ -315,8 +324,9 @@ function setupGUI() {
   const controlPanel = document.getElementById('control-panel');
   const toggleBtn = document.getElementById('toggle-panel');
   toggleBtn.addEventListener('click', () => {
-    controlPanel.classList.toggle('collapsed');
-    toggleBtn.textContent = controlPanel.classList.contains('collapsed') ? '+' : '—';
+    const collapsed = controlPanel.classList.toggle('collapsed');
+    toggleBtn.textContent = collapsed ? '+' : '—';
+    toggleBtn.setAttribute('aria-expanded', String(!collapsed));
   });
 }
 
@@ -346,7 +356,8 @@ function enterComparisonMode() {
   
   // Hide preset select active states
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  
+  syncAriaPressed();
+
   // Show comparison panels and cinematic flyby button
   document.getElementById('comparison-focus-panel').style.display = 'flex';
   document.getElementById('comparison-scale-toggle-container').style.display = 'flex';
@@ -357,6 +368,7 @@ function enterComparisonMode() {
   compBtn.style.background = 'rgba(255, 56, 56, 0.15)';
   compBtn.style.borderColor = 'rgba(255, 56, 56, 0.4)';
   compBtn.style.color = '#ff3838';
+  compBtn.setAttribute('aria-pressed', 'true');
 
   if (!comparisonGroup) {
     comparisonGroup = new THREE.Group();
@@ -398,7 +410,8 @@ function enterComparisonMode() {
       const btn = document.createElement('button');
       btn.className = 'nav-btn focus-star-btn';
       btn.setAttribute('data-index', index);
-      
+      btn.setAttribute('aria-pressed', 'false');
+
       // Clean up display names for HUD grid buttons
       let nameText = star.displayName.replace('(Sol)', '').replace('Centauri', '').trim().toUpperCase();
       btn.textContent = nameText;
@@ -474,6 +487,7 @@ function exitComparisonMode() {
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
   const restoredBtn = document.querySelector(`.preset-btn[data-preset="${sun.currentPresetName}"]`);
   if (restoredBtn) restoredBtn.classList.add('active');
+  syncAriaPressed();
   
   // Hide comparison panels
   document.getElementById('comparison-focus-panel').style.display = 'none';
@@ -492,6 +506,7 @@ function exitComparisonMode() {
   compBtn.style.background = 'rgba(0, 255, 128, 0.1)';
   compBtn.style.borderColor = 'rgba(0, 255, 128, 0.4)';
   compBtn.style.color = '#00ff80';
+  compBtn.setAttribute('aria-pressed', 'false');
 
   // Fly camera back to center
   isFlying = true;
@@ -511,6 +526,7 @@ function exitComparisonMode() {
 
   // Reset focus button active states
   document.querySelectorAll('.focus-star-btn').forEach(b => b.classList.remove('active'));
+  syncAriaPressed();
 
   updateGUIDisplay();
   updatePhysicalHUD();
@@ -565,6 +581,7 @@ function focusOnComparisonStar(index) {
     if (i === index) btn.classList.add('active');
     else btn.classList.remove('active');
   });
+  syncAriaPressed();
 
   // Trigger camera flight to new target star
   isFlying = true;
@@ -870,7 +887,8 @@ function setupHUDBindings() {
       // Toggle active styling states
       presetButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      
+      syncAriaPressed();
+
       // Scale minimum camera zoom distance to match the star's boundaries
       controls.minDistance = 140.0 * sun.params.scale;
       
@@ -904,6 +922,7 @@ function setupHUDBindings() {
     btn.addEventListener('click', () => {
       navButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+      syncAriaPressed();
 
       const distType = btn.getAttribute('data-distance');
       isFlying = true;
@@ -943,6 +962,7 @@ function setupHUDBindings() {
     scaleVisualBtn.addEventListener('click', () => {
       scaleVisualBtn.classList.add('active');
       scaleRealBtn.classList.remove('active');
+      syncAriaPressed();
       comparisonScaleMode = 'visual';
       updateComparisonLayout();
       updateComparisonLensFlares();
@@ -951,6 +971,7 @@ function setupHUDBindings() {
     scaleRealBtn.addEventListener('click', () => {
       scaleRealBtn.classList.add('active');
       scaleVisualBtn.classList.remove('active');
+      syncAriaPressed();
       comparisonScaleMode = 'real';
       updateComparisonLayout();
       updateComparisonLensFlares();
@@ -1001,7 +1022,8 @@ function setupHUDBindings() {
     
     // Clear preset button active states
     presetButtons.forEach(b => b.classList.remove('active'));
-    
+    syncAriaPressed();
+
     // Apply parsed settings to the Sun procedurally
     sun.setPreset(settings);
     
