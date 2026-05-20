@@ -550,8 +550,14 @@ function focusOnComparisonStar(index) {
   const star = comparisonStars[index];
   activeFocusedStar = star;
 
-  // Copy star's parameters to sun.params so GUI matches it
+  // Copy star's parameters to sun.params so GUI matches it.
+  // Preserve lensFlaresEnabled across the copy: it represents a global user preference
+  // (the GUI checkbox is the master switch in comparison mode), not per-star state.
+  // Without this guard, toggling flares OFF while focused on star A and then focusing
+  // star B silently re-enables them because B's params still hold the default `true`.
+  const preservedFlareEnabled = sun.params.lensFlaresEnabled;
   sun.copyParams(star.params, sun.params);
+  sun.params.lensFlaresEnabled = preservedFlareEnabled;
 
   // Highlight active button in focus panel
   const focusButtons = document.querySelectorAll('.focus-star-btn');
