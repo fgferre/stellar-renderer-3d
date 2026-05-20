@@ -26,3 +26,6 @@ dist-ssr
 # Temporary process files
 vite-dev.pid
 
+# Local CLI tool state
+.antigravitycli/
+
