@@ -16,6 +16,12 @@ let scene, camera, renderer, controls, gui;
 let sun, starfield;
 let composer, bloomPass;
 let clock, timeSpeed = 1.0;
+// Accumulator for simulated shader time. Decouples shader animation from
+// timeSpeed changes (slider drags) — using clock.getElapsedTime() * timeSpeed
+// caused a visible jump whenever the user changed speed (e.g. timeSpeed 1->2
+// at t_real=10s made the multiplied value jump from 10 to 20). Advance per
+// frame instead so changes apply forward in time only.
+let simTime = 0;
 let lastTelemetryUpdateTime = 0;
 let usePostProcessing = false; // Default to direct WebGL rendering for 60 FPS
 
@@ -1094,7 +1100,11 @@ function animate() {
   requestAnimationFrame(animate);
 
   const delta = clock.getDelta();
-  const elapsed = clock.getElapsedTime() * timeSpeed;
+  // Clamp to absorb tab-unsuspend gaps so a 5-second backgrounded gap doesn't
+  // fast-forward shader animation by 5 seconds.
+  const simDelta = Math.min(delta, 0.1) * timeSpeed;
+  simTime += simDelta;
+  const elapsed = simTime;
 
   // 1. Process flight autopilot or cinematic camera
   if (isCinematicMode) {
