@@ -1101,8 +1101,13 @@ function animate() {
     cinematicTime += delta;
     updateCinematicCamera(elapsed, delta);
   } else if (isFlying) {
-    camera.position.lerp(flightTargetPos, flightSpeed);
-    controls.target.lerp(flightTargetLookAt, flightSpeed);
+    // Frame-rate independent exponential decay: at delta = 1/60s, lerpFactor == flightSpeed
+    // exactly (same feel as the old 60-FPS-tuned constant). Clamp delta to avoid huge
+    // catch-up jumps when the tab was backgrounded.
+    const clampedDelta = Math.min(delta, 0.1);
+    const lerpFactor = 1.0 - Math.pow(1.0 - flightSpeed, clampedDelta * 60.0);
+    camera.position.lerp(flightTargetPos, lerpFactor);
+    controls.target.lerp(flightTargetLookAt, lerpFactor);
     
     // Stop flight when camera is close to target, dynamically scaled to avoid floating point precision lockups
     const activeStar = (isComparisonMode && activeFocusedStar) ? activeFocusedStar : sun;
