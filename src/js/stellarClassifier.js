@@ -366,8 +366,7 @@ export function lookupHYGStar(nameQuery) {
       }
       params.scale = visualScale;
       params.displayName = `${entry.name} (${entry.spect})`;
-      params.realTemp = entry.temp;
-      
+
       // Override estimated temperatures and color grading with actual catalog values
       params.highTemp = entry.temp * 1.1;
       params.lowTemp = entry.temp * 0.8;
