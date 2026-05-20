@@ -4,96 +4,105 @@
 
 ## APIs & External Services
 
-**Web Fonts:**
-- Google Fonts (`fonts.googleapis.com`, `fonts.gstatic.com`) - Loads the `Orbitron` (400/600/900) and `Outfit` (300/400/600) font families used for the cockpit HUD and main typography
-  - SDK/Client: Plain HTML `<link>` tags
-  - Auth: None (public CDN)
-  - Files: `index.html:13-15` (preconnect + stylesheet link); replicated in `dist/index.html:13-15`
-  - Failure mode: If blocked, browser falls back to `sans-serif` (declared in `src/style.css:16` via `font-family: 'Outfit', sans-serif`)
+**No third-party APIs are called at runtime.** The application is a fully self-contained, client-side WebGL 2 simulation. There are no `fetch`, `XMLHttpRequest`, `axios`, `WebSocket`, or SDK calls anywhere in `src/`.
 
-**Other APIs:**
-- None - No `fetch()`, `XMLHttpRequest`, `axios`, or WebSocket usage anywhere in `src/`. Confirmed via repository-wide grep.
-
-## Browser-Native APIs Used
-
-These are not external services but are worth noting because the app depends on them:
-
-- **WebGL 2** - `THREE.WebGLRenderer` (`src/js/main.js:48`) with `powerPreference: "high-performance"` and `antialias: true`
-- **Canvas 2D** - Procedural texture generation for lens flares (`src/js/sun.js:13-93`: `createGlowTexture`, `createRingTexture`, `createHexagonTexture`)
-- **DOM APIs** - `document.getElementById` / `querySelectorAll` for HUD bindings (`src/js/main.js:29-34, 181-306`)
-- **`window.devicePixelRatio`** - Pixel ratio capped at 2 for performance (`src/js/main.js:50`)
-- **`requestAnimationFrame`** - Render loop driver (`src/js/main.js:370`)
-- **`window.onload`, `window.addEventListener('resize')`** - Application bootstrap and viewport resize handling (`src/js/main.js:424, 105`)
+**Web Fonts (CDN, declarative):**
+- **Google Fonts** - `fonts.googleapis.com` + `fonts.gstatic.com`
+  - SDK/Client: None — loaded via standard `<link rel="stylesheet">` in `index.html:13-15`.
+  - Families: `Orbitron` (weights 400/600/900) and `Outfit` (weights 300/400/600).
+  - Auth: None (public CDN).
+  - Failure mode: HUD falls back to `sans-serif` (`src/style.css:16`, `src/style.css:54`).
+  - Preconnect hints declared for both origins.
 
 ## Data Storage
 
 **Databases:**
-- None - Application has no persistent storage. No IndexedDB, no `localStorage`, no `sessionStorage`, no remote database.
+- None. No remote database, no ORM, no SQL/NoSQL clients.
+
+**Local in-memory "catalog":**
+- `HYG_DATABASE` constant (16 famous stars) defined inline at `src/js/stellarClassifier.js:329-348`. It is named after the public HYG astronomy catalog but is a hardcoded JavaScript object — not a network query. Lookup via `lookupHYGStar(nameQuery)` in `src/js/stellarClassifier.js:350-404`.
+
+**Browser Storage:**
+- None. No use of `localStorage`, `sessionStorage`, `IndexedDB`, cookies, or the Cache API. Star parameters reset on page reload.
 
 **File Storage:**
-- Local filesystem only - Static assets bundled into `dist/`:
-  - `public/favicon.svg`, `public/icons.svg` - copied verbatim to `dist/` by Vite
-  - `src/assets/hero.png`, `src/assets/javascript.svg`, `src/assets/vite.svg` - present but not referenced by the runtime code (orphan template files from a Vite scaffold)
-- The favicon used by `index.html:5` is inlined as a `data:image/svg+xml` URL, not loaded from `public/`
+- Static asset bundle only (served by Vite from `public/` and `src/assets/`). No upload, blob storage, or CDN integration.
 
 **Caching:**
-- None - No service worker, no Cache API usage, no in-memory caching layer beyond Three.js's built-in geometry/material reuse
+- None at application level. Browser-default HTTP caching applies to static assets.
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- None - No login, no users, no session concept. The application is a fully anonymous, single-page stellar simulator.
+- None. There is no concept of user, session, login, signup, or identity in the codebase.
+- The UI is a single-user interactive sandbox; no authorization checks exist.
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None - No Sentry, Rollbar, Bugsnag, or equivalent integration. Errors surface only via the browser DevTools console.
-
-**Logs:**
-- Browser `console` - No explicit `console.log` / `console.error` calls observed in `src/js/`; runtime logging happens only via Three.js / Vite default warnings.
+- None. No Sentry, Bugsnag, Rollbar, Datadog, or similar SDK present.
+- Errors fall through to the browser console only.
 
 **Analytics:**
-- None - No Google Analytics, Plausible, Umami, or similar tag detected in `index.html` or anywhere else.
+- None. No Google Analytics, Plausible, PostHog, Mixpanel, Segment, gtag, or comparable beacon.
+
+**Logs:**
+- Standard `console.*` only. No structured logging library.
+
+**Performance:**
+- No Real-User-Monitoring (RUM) integration. FPS / GPU performance is tuned in-code via:
+  - `renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))` (`src/js/main.js:73`)
+  - Half-resolution bloom target (`src/js/main.js:122`)
+  - Optional post-processing toggle (`usePostProcessing` flag at `src/js/main.js:20`).
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Not configured in-repo - No `vercel.json`, `netlify.toml`, `firebase.json`, GitHub Pages workflow, or other host-specific manifest. Output is the standard `dist/` directory that any static host (Vercel, Netlify, Cloudflare Pages, GitHub Pages, S3+CloudFront, plain Apache/Nginx) can serve.
+- Not configured in repo. The build output (`dist/`) is a static asset bundle deployable to any static host (Netlify, Vercel, GitHub Pages, S3 + CloudFront, etc.).
 
 **CI Pipeline:**
-- None - No `.github/workflows/`, `.gitlab-ci.yml`, `azure-pipelines.yml`, or `Jenkinsfile` present. Builds are produced manually via `npm run build`.
+- None. No `.github/workflows/`, no `.gitlab-ci.yml`, no `circle.yml`, no `azure-pipelines.yml`.
 
-## Embedded "Database" - Stellar Reference Data
-
-The application ships one piece of static reference data inline:
-
-- **HYG (Hipparcos-Yale-Gliese) star reference list** - 15 named stars (`Sun`, `Sirius A/B`, `Betelgeuse`, `Rigel`, `Vega`, `Aldebaran`, `Polaris`, `Proxima Centauri`, `Canopus`, `Arcturus`, `Antares`, `Deneb`) hard-coded as `HYG_DATABASE` in `src/js/stellarClassifier.js:193-210`
-- Looked up by name via `lookupHYGStar()` (`src/js/stellarClassifier.js:212-236`)
-- Each entry stores `name`, `spect` (Morgan-Keenan class), `temp` (Kelvin), `lum` (relative luminosity)
-- This is a hand-curated subset, not a network call to a real HYG/Hipparcos catalog API
+**Container/Infra:**
+- None. No `Dockerfile`, `docker-compose.yml`, `Procfile`, or infrastructure-as-code files.
 
 ## Environment Configuration
 
 **Required env vars:**
-- None - The build and runtime require zero environment variables.
+- None. The application reads no environment variables at runtime or build time.
 
 **Secrets location:**
-- Not applicable - No `.env*` files exist in the repo, and `.gitignore` lines 12-13 (`*.local`) would exclude them if they were ever added.
+- N/A — no secrets exist in the codebase.
+- No `.env`, `.env.*`, `*.pem`, or credential files present.
+- `.gitignore` does not list `.env` files because none are needed.
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None - Static site, no server endpoints.
+- None. No HTTP server, no API surface.
 
 **Outgoing:**
-- None - Application makes zero outbound HTTP/HTTPS requests at runtime aside from the initial Google Fonts stylesheet fetch declared in `index.html`.
+- None. No outbound network calls.
 
-## Build-Time External Dependencies
+## Outbound Network Surface (Exhaustive)
 
-These are downloaded only when `npm install` runs, never at runtime:
+The only external network traffic this app produces, in normal operation, is:
 
-- npm registry (`https://registry.npmjs.org`) - source for `three`, `lil-gui`, `vite`, and all transitive Vite/Rolldown packages (verified across `package-lock.json` resolved URLs)
-- Rolldown native binding tarballs (`@rolldown/binding-*`) - platform-specific Rust binaries pulled by Vite 8's optional dependencies
+| Origin | Purpose | Trigger | File |
+|--------|---------|---------|------|
+| `https://fonts.googleapis.com` | Web font CSS | `<link>` in HTML | `index.html:13`, `index.html:15` |
+| `https://fonts.gstatic.com` | Web font binary (woff2) | Resolved by Google Fonts CSS | `index.html:14` |
+
+No other domains are contacted. The app is offline-capable after fonts have been cached by the browser.
+
+## Browser Platform APIs Used
+
+These are not "integrations" in the SaaS sense, but they are the runtime contract the app depends on:
+
+- **WebGL 2.0** via `THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" })` (`src/js/main.js:71`).
+- **Canvas 2D** for procedurally generating lens-flare textures (`src/js/sun.js:13-95`).
+- **DOM APIs** — `document.getElementById`, `addEventListener`, `requestAnimationFrame` (via Three.js animation loop), `window.onload` (`src/js/main.js:1228`), `window.addEventListener('resize', ...)` (`src/js/main.js:149`).
+- **CSS Backdrop Filter** for glass panel effects (`src/style.css:32-50`).
 
 ---
 

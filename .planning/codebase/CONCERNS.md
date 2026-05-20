@@ -4,292 +4,356 @@
 
 ## Tech Debt
 
-**Fragile DOM Initialization at Module Load:**
-- Issue: DOM elements are queried at module top-level via `document.getElementById` before `init()` runs, with no null-checks before `.querySelector` chaining.
-- Files: `src/js/main.js:29-34`
-- Impact: Line 32 (`document.getElementById('hud-star-class').querySelector('.reading-value')`) throws `TypeError` if the `#hud-star-class` element is missing or if the script is loaded before DOM parsing completes. The script is loaded as a module (deferred) from `index.html:110`, so this works in practice, but the pattern remains fragile to template renaming.
-- Fix approach: Move DOM queries inside `init()` (called via `window.onload` at `src/js/main.js:424`), or use optional chaining and null guards.
+**main.js is a "god file" orchestrator:**
+- Issue: Single module of 1,228 lines handles WebGL setup, scene composition, GUI wiring, HUD/DOM event binding, telemetry, autopilot flight, comparison mode lifecycle, cinematic flyby choreography, HTML 3D label projection, and the render loop.
+- Files: `src/js/main.js` (1228 lines)
+- Impact: Any change carries broad surface area; new features bolt on as additional global variables and `setupHUDBindings()` clauses; reading flow requires scrolling across unrelated subsystems.
+- Fix approach: Extract subsystems into modules — `controllers/autopilot.js` (state at `main.js:28-32`, logic at `main.js:1091-1102`), `controllers/comparison.js` (state at `main.js:34-40`, lifecycle at `main.js:287-584`), `controllers/cinematic.js` (lifecycle at `main.js:637-759`, animation choreography at `main.js:1137-1186`), `ui/hud.js` (telemetry helpers at `main.js:1044-1078`), `ui/labels.js` (3D label projection at `main.js:586-635`), `ui/gui.js` (lil-gui wiring at `main.js:173-284`). Keep `main.js` as a thin bootstrap.
 
-**Repeated Inline Uniform Wiring in GUI Setup:**
-- Issue: Each `gui.add(...)` call inlines an explicit `onChange` lambda that copies a `sun.params` value into `sun.coreMaterial.uniforms.X.value`. The same param-to-uniform pairing is then duplicated in `Sun.setPreset()` lines 381-398.
-- Files: `src/js/main.js:127-148`, `src/js/sun.js:381-398`
-- Impact: Adding a new parameter requires synchronized edits in three places (params init, GUI binding, `setPreset` uniform write). Easy to drift.
-- Fix approach: Centralize a `params → uniforms` mapping table and use it both for the GUI bindings and inside `setPreset()`.
+**`bloomStrength` parameter accepted but never read:**
+- Issue: `Sun.update(time, bloomStrength = 1.0)` declares `bloomStrength`, but the body never references it. Callers at `main.js:1196` and `main.js:1199` still pass `bloomPass.strength`.
+- Files: `src/js/sun.js:310`
+- Impact: Dead API surface; suggests an unfinished feature (corona reacts to bloom) — comment at `src/js/sun.js:343-344` ("Dynamically adjust corona density and lens flare scale based on bloom") describes behavior that is not implemented.
+- Fix approach: Either drop the parameter and the misleading comment, or wire bloom-driven corona scaling.
 
-**Bidirectional Coupling Between `main.js` and `Sun` Internals:**
-- Issue: `main.js` reaches into `sun.coreMaterial.uniforms.uHighTemp.value` directly (lines 127-148) rather than going through a setter on `Sun`. `main.js` also mutates `sun.params.lensFlaresEnabled` from `updateAutoExposure` (lines 340-347).
-- Files: `src/js/main.js:127-148`, `src/js/main.js:340-347`
-- Impact: `Sun` cannot enforce invariants on its own state; consumers depend on private fields.
-- Fix approach: Expose `Sun.setUniform(name, value)` or per-parameter setters that internally update both `params` and uniforms.
+**Dead `sizeUniform` local in render hot path:**
+- Issue: `const sizeUniform = this.coronaMaterial.uniforms.uScale.value;` is assigned every frame and never read.
+- Files: `src/js/sun.js:345`
+- Impact: Minor — a redundant property lookup per star per frame (12 lookups/frame in comparison mode). Mostly clutter.
+- Fix approach: Delete the line.
 
-**Hardcoded Magic Numbers Scattered Across Files:**
-- Issue: Physical and scene constants are inlined throughout the codebase instead of being centralized in a single config module:
-  - Scene scale ratio `800.0 units = 1 AU` (`src/js/main.js:353`)
-  - Earth orbital reference `29.78 km/s` (`src/js/main.js:357`)
-  - Sun reference temp `5778 K` (`src/js/stellarClassifier.js:194-195, 217`)
-  - Auto-exposure normalization range `140.0`/`5860.0` (`src/js/main.js:321`)
-  - Lens flare distance threshold `170.0` (`src/js/main.js:340-343`)
-  - Starfield shell radius `25000-35000` (`src/js/starfield.js:26`)
-  - Far clip plane `500000`, max zoom `150000.0` (`src/js/main.js:44, 61`)
-  - Corona billboard radius ratio `100.0 / 240.0 = 0.416` (`src/js/shaders.js:434-435`)
-- Impact: Tuning the simulation requires hunting through three or four files; the corona shader's `coreScaleDist = 0.416` is a hand-computed constant that will silently desync if `coronaSize` (`src/js/sun.js:178`) or core scale changes.
-- Fix approach: Create `src/js/config.js` (or `constants.js`) exporting `SCENE_SCALE`, `T_SUN`, `CORONA_RADIUS_RATIO`, etc. Pass `coreScaleDist` to the shader as a uniform rather than a hardcoded literal.
+**Inline styling sprawl in JS overrides external stylesheet:**
+- Issue: Button states (background, border, color) are mutated via `element.style.*` on enter/exit of comparison and cinematic modes, fighting the `.nav-btn.active` rules in `style.css`.
+- Files: `src/js/main.js:310-312`, `main.js:439-441`, `main.js:652-668`, `main.js:904-906`, `main.js:910`
+- Impact: Two parallel sources of truth (CSS + JS). Adding a new visual state means hunting through both. Specificity issues already required `style.css:180-183` per-preset overrides.
+- Fix approach: Add CSS classes (e.g., `.btn-state-active`, `.btn-state-flyby`, `.btn-state-stop`) and toggle them via `classList`. Move all color/background literals into `style.css`.
 
-**Hardcoded DOM IDs Throughout `main.js`:**
-- Issue: 10+ string IDs (`#canvas-container`, `#gui-container`, `#control-panel`, `#toggle-panel`, `#val-distance`, `#val-velocity`, `#val-temperature`, `#hud-star-class`, `#load-progress`, `#loader`, `#input-custom-class`, `#btn-apply-custom-class`) are hardcoded as inline string literals.
-- Files: `src/js/main.js:29-34, 54, 121, 172-173, 240-241`
-- Impact: Renaming any HTML id silently breaks the app at runtime with no compile-time warning.
-- Fix approach: Extract into a constants object: `const DOM_IDS = { canvasContainer: 'canvas-container', ... }`.
+**Heavy inline `style="..."` on HUD markup in `index.html`:**
+- Issue: 14 inline `style=` attributes carry layout/typography for HUD subsections (`index.html:85-88`, `index.html:99-121`).
+- Files: `index.html:85-121`
+- Impact: Same dual-source-of-truth problem; `style.css` controls some HUD pieces while critical layout lives in HTML. Breaks at media-query boundaries.
+- Fix approach: Lift the inline styles into named CSS classes in `style.css` and reference them by class.
 
-**Duplicated Texture Generation Logic:**
-- Issue: `createGlowTexture`, `createRingTexture`, `createHexagonTexture` (`src/js/sun.js:13-93`) each repeat the same boilerplate: create canvas, get 2D context, decompose `THREE.Color` into r/g/b ints, fill, return `THREE.CanvasTexture`.
-- Files: `src/js/sun.js:13-93`
-- Impact: ~80 lines that could be ~25 with a shared helper.
-- Fix approach: Extract `withCanvasTexture(size, drawFn)` helper.
+**Cinematic timeline is a chain of hardcoded magic time gates:**
+- Issue: `updateCinematicCamera` and the per-star choreographer use literal seconds (7.0, 16.0, 27.0, 38.0; and 6.0/7.0 split) intermingled with star-index literals (0, 2, 7).
+- Files: `src/js/main.js:688-759`, `main.js:1137-1186`
+- Impact: Adding a star or rebalancing a "Take" requires editing two locations in lockstep. The index `7` references "Rigel" only by position in the lineup array (`main.js:326`); reordering the lineup silently breaks the eclipse take.
+- Fix approach: Introduce a `cinematicTimeline` config (array of `{ start, end, name, focusIndex, ... }`) and a separate `starIndexByName` lookup. Drive both the camera path and the per-star choreography from the same table.
 
-**Duplicated `sol` Preset Defaults:**
-- Issue: The default Sol parameters are written once in the `Sun` constructor (`src/js/sun.js:101-120`) and again inside `setPreset('sol')` (`src/js/sun.js:291-308`). The two copies differ subtly — `lowTemp` is `4200.0` in the constructor vs. `4400.0` in the preset.
-- Files: `src/js/sun.js:101-120`, `src/js/sun.js:291-308`
-- Impact: The first-load "Sol" state does not match the state restored when the user clicks the Sol preset button. Subtle and easy to miss.
-- Fix approach: Define presets in a module-level constant, then call `setPreset('sol')` from the constructor.
+**`comparisonStars[index] = 7` magic constant for "Rigel":**
+- Issue: The David & Goliath take addresses Sirius B / Sol / Rigel by index 0, 2, 7 in the lineup array.
+- Files: `src/js/main.js:1156`, `main.js:1166`, `main.js:1176`; lineup at `main.js:318-331`
+- Impact: Coupling between lineup ordering and animation logic is unenforced.
+- Fix approach: Look up indices by name (`.findIndex(d => d.name === 'Rigel')`).
 
-**Empty `simplexNoiseGLSL` Export Unused for Surface Shader:**
-- Issue: `shaders.js` exports both `simplexNoiseGLSL` and `valueNoiseGLSL`, but the surface fragment shader uses only `valueNoiseGLSL` while prominences/corona use `simplexNoiseGLSL`. This is intentional, but the comment header at `src/js/shaders.js:1` (`Custom GLSL 3.0 / WebGL 2 Shaders`) is misleading — the shaders contain no GLSL 3.00 ES `#version` directive and rely on Three.js to inject the version. The "WebGL 2" claim in the comment, HTML title, and footer is mostly cosmetic.
-- Files: `src/js/shaders.js:1`, `index.html:9, 93`
-- Impact: No actual breakage, but a future contributor may believe GLSL ES 3.00 features (e.g., `texture()` over `texture2D()`, integer ops, `in/out` qualifiers) can be used and find them broken.
-- Fix approach: Either upgrade `THREE.ShaderMaterial` to `THREE.RawShaderMaterial` with explicit `#version 300 es`, or remove the "WebGL 2" wording and the GLSL 3.0 comment.
+**Color-class assignment via `displayName.includes(...)` substring sniffing:**
+- Issue: `focusOnComparisonStar` decides whether to apply the `yellow-dwarf`/`red-giant`/`blue-super`/`white-dwarf` CSS class by string-searching the display name for "Arcturus", "Aldebaran", "Antares", "Betelgeuse", "UY Scuti", "Red", "Rigel", "Deneb", "Vega", "Sirius A", "Blue".
+- Files: `src/js/main.js:486-494`
+- Impact: Adding a new star requires editing both `lineupData` and the if-chain. Each catalog star already has `params.specClass`, `params.highTemp`, and `params.lum` to drive the same decision physically.
+- Fix approach: Derive the CSS class from `star.params.highTemp` ranges (the same logic already used in `Sun.updateLensFlares` at `sun.js:272-284`). Centralize "temperature → CSS class" in one helper.
+
+**Custom-class prefix parsing is brittle and crash-prone:**
+- Issue: `prefix = isHYG ? settings.displayName.split('(')[1][0] : cleanStr[0]` — if a HYG entry's `displayName` lacks `(` (e.g. a future entry), this throws `TypeError: Cannot read properties of undefined (reading '0')`.
+- Files: `src/js/main.js:928`
+- Impact: Adding a HYG entry without parenthesized spectral suffix silently crashes the GENERATE button.
+- Fix approach: Use `params.specClass` (already returned by `parseMKClassification` at `stellarClassifier.js:323`) instead of re-parsing the display name.
+
+**Hardcoded scale-to-AU conversion:**
+- Issue: `const distanceAU = distance / 800.0;` — magic constant tying telemetry to scene scale.
+- Files: `src/js/main.js:1050`
+- Impact: Any change to `coreGeometry` radius (currently 100.0 at `sun.js:170`) breaks the AU readout. Same risk for `baseSpeedVal = 29.78` km/s and `radiationFluxTemp` formula.
+- Fix approach: Define `SCENE_UNITS_PER_AU = 800.0` next to other rendering constants and reference from telemetry.
+
+**Forgotten/stale `// HYG Database` schema:**
+- Issue: HYG entries hardcode `temp`, `lum`, `mass`, `radius`, `vRot` but also store `spect`. `lookupHYGStar` overwrites the `parseMKClassification` estimates with catalog values (`stellarClassifier.js:372-380`). Some overrides (`oblateness`, `polarJetIntensity`) live in a per-name `if` chain at `stellarClassifier.js:383-398` rather than as data on the entry.
+- Files: `src/js/stellarClassifier.js:329-348`, `:383-398`
+- Impact: New catalog stars with special oblateness/jet behavior must be added to two places.
+- Fix approach: Extend HYG entries with optional `oblateness`, `polarJetIntensity`, `rotationSpeed` fields and apply them generically.
 
 ## Known Bugs
 
-**Resize Handler Runs Before `composer` is Defined Under Some Loads:**
-- Symptoms: `composer.setSize(...)` at `src/js/main.js:417` is called unconditionally inside `onWindowResize`. While `init()` registers the listener only after creating the composer, any resize fired between `composer = ...` (line 86) and `window.addEventListener('resize', ...)` (line 105) is impossible — but if `init` ever fails partway, the listener might still be attached, leading to a `TypeError: Cannot read properties of undefined`.
-- Files: `src/js/main.js:412-421`
-- Trigger: Errors during scene construction (e.g., WebGL context failure) followed by a window resize.
-- Workaround: Add `if (composer) composer.setSize(...)`.
+**Resize before composer exists crashes init race:**
+- Symptoms: `onWindowResize` calls `composer.setSize(...)` unconditionally at `main.js:1221`. If a resize event fires before `composer` is constructed (composer is created at line 130, listener registered at line 149 — currently safe), or if init throws after the listener is registered but before composer assignment, the handler throws `TypeError: Cannot read properties of undefined (reading 'setSize')`.
+- Files: `src/js/main.js:1216-1225`
+- Trigger: Init failure between `addEventListener('resize', …)` and the composer assignment.
+- Workaround: None.
+- Fix approach: Guard with `if (composer) composer.setSize(...)` mirroring the existing `if (bloomPass)` check.
 
-**`updateTelemetry` Receives `delta` But Never Uses It:**
-- Symptoms: Line 351 declares `function updateTelemetry(distance, delta)` and the caller passes `delta` (line 396), but the parameter is never referenced. Telemetry values are recomputed every tick rather than smoothed over `delta`, so the displayed sensor temperature and orbital speed jitter visibly if the user spins the camera quickly.
-- Files: `src/js/main.js:351-366`, `src/js/main.js:396`
-- Trigger: Any camera movement.
-- Workaround: Either remove the unused param or use it to lerp the displayed values toward their targets.
+**Color picker swaps to blue-channel-dominant lose data:**
+- Symptoms: `surfaceFragmentShader` swizzles palette via `.bgr` when `uColorGrading.z > uColorGrading.x * 1.05` (`shaders.js:244-254`). The GUI proxy that reads `colorGrading` divides by the max channel to derive a hex string (`main.js:96-102`, `main.js:976-984`). After a swap and re-paint, the proxy hex no longer round-trips to the same RGB.
+- Files: `src/js/shaders.js:244-254`, `src/js/main.js:976-984`, `main.js:210-219`
+- Trigger: Pick "Blue Supergiant" preset, then drag the "Star Tint Color" picker.
+- Workaround: Reset to default.
+- Fix approach: Stop encoding the magnitude inside `colorGrading.xyz`; store hue/saturation separately from a brightness scalar so the GUI proxy and the shader agree.
 
-**Custom Class Parser Regex Edge Case for Single-Digit Subclass with No Luminosity:**
-- Symptoms: Regex `/^([OBAFGKM]|D[ABCOQXY])([0-9]?)(I[AB]|I{1,3}|IV|V|VI|VII)?$/` at `src/js/stellarClassifier.js:47`. A plain spectral letter like `"G"` would parse with `subclass=''` → defaulted to `5`, and `lumClass=undefined` → defaulted to `V`. This is fine, but `"DA"` (white dwarf no subclass) yields `subclass=5`, `lumClass='VII'`. `"DAVI"` would not match (no digit between `DA` and `VI`). The HYG entry `"VEGA"` (`A0V`) does parse, but a query like `"vega "` (trailing space stripped) is normalized correctly by `lookupHYGStar` (line 213 strips non-alphanumerics) yet `parseMKClassification` (line 41) only trims whitespace and uppercases — internal whitespace inside an MK string would still pass through `.replace(/\s+/g, '')`, which actually handles it. So no real bug here, but the two normalization functions diverge.
-- Files: `src/js/stellarClassifier.js:41`, `src/js/stellarClassifier.js:213`
-- Trigger: Passing strings with mixed separators like `"G-2-V"` succeeds in HYG lookup but fails MK parse.
-- Workaround: Unify normalization (strip `[^A-Z0-9]` in both code paths).
+**`copyParams` only copies keys present on `source`:**
+- Symptoms: `copyParams(source, target)` iterates `for (const key in source)`. When entering comparison mode, `mainSunParamsBackup` is initialized to `{}` and populated from `sun.params` (`main.js:292-293`). On exit, `sun.copyParams(mainSunParamsBackup, sun.params)` will not unset keys added during comparison if any.
+- Files: `src/js/sun.js:129-141`, `src/js/main.js:292-293`, `main.js:405-408`
+- Trigger: A future code path that adds a property to `sun.params` while in comparison mode would persist after exit.
+- Workaround: Today the param schema is closed.
+- Fix approach: Snapshot all known params; or store a deep-clone of `sun.params` (defaults + values) rather than iterating `source`.
 
-**`isFlying` Never Clears `flightTargetLookAt`:**
-- Symptoms: `flightTargetLookAt` is declared as `new THREE.Vector3(0, 0, 0)` (`src/js/main.js:25`) and is lerped into `controls.target` each frame while flying. The `nav-btn` handlers (lines 218-237) set `flightTargetPos` but never write `flightTargetLookAt`, so it permanently remains `(0,0,0)`. Functionally this works because the star sits at origin, but it is dead code that obscures intent.
-- Files: `src/js/main.js:25`, `src/js/main.js:218-237`, `src/js/main.js:378`
-- Trigger: Any autopilot button click.
-- Workaround: Either remove `flightTargetLookAt` entirely or wire it to a per-button target.
+**`updateAutoExposure` mutates `star.params.lensFlaresEnabled` permanently:**
+- Symptoms: When the camera enters the close-range "no flare" zone, the code writes `star.params.lensFlaresEnabled = false` (`main.js:1035`). On exiting the zone, it restores `true` only if `sun.params.lensFlaresEnabled` is also true (`main.js:1037`). If the user disables flares globally while close, then zooms out, the focused star is restored to enabled regardless of the user's intent on that specific star.
+- Files: `src/js/main.js:1034-1041`
+- Trigger: Toggle "Camera Lens Flares" off in close orbit, zoom out.
+- Workaround: Toggle off again.
+- Fix approach: Track a separate `_flareForceOff` flag rather than overwriting `params.lensFlaresEnabled`.
 
-**`updateAutoExposure` Force-Toggles `lensFlaresEnabled` Every Frame:**
-- Symptoms: Lines 340-347 set `sun.params.lensFlaresEnabled = false` then call `sun.updateLensFlares()` whenever camera distance < 170. Each toggle re-disposes the old canvas textures and creates three new ones (~512×512, 512×512, 128×128) via `document.createElement('canvas')`. While the `false` branch returns early without allocating, the camera hovering near the threshold causes `updateLensFlares` to be called twice per frame transition.
-- Files: `src/js/main.js:340-347`, `src/js/sun.js:208-263`
-- Trigger: Camera oscillation around distance ≈ 170 (very common with damped orbit controls).
-- Workaround: Track previous state and call `updateLensFlares()` only on actual transitions.
+**`copyParams` loses `Vector3` instance identity on reassignment:**
+- Symptoms: When `source[key]` is a `Vector3` but `target[key]` is not, `copyParams` assigns a `clone()` (`sun.js:135`). The next call could leave `target` with a fresh `Vector3` reference. Three.js `ShaderMaterial.uniforms.*.value` is set to a specific `Vector3` reference (e.g. `sun.js:476`); if a future code path bypasses `applyCurrentParams` and assumes the uniform still points to the same `Vector3`, mutating `params.colorGrading.x = ...` will not propagate to the shader.
+- Files: `src/js/sun.js:129-141`, `sun.js:476-491`
+- Trigger: Currently latent — guarded because `applyCurrentParams` reassigns uniform `.value` every change.
+- Workaround: Always call `applyCurrentParams`.
+- Fix approach: Prefer in-place `target[key].copy(source[key])` and pre-allocate Vector3s on the param object.
 
 ## Security Considerations
 
-**External Font CDN Without SRI or CSP:**
-- Risk: `index.html:13-15` loads `https://fonts.googleapis.com/css2` and pre-connects to `https://fonts.gstatic.com`. No `Content-Security-Policy` header, no Subresource Integrity hash. A compromised Google Fonts endpoint could inject arbitrary CSS that, while unlikely to execute JS, could exfiltrate IP/User-Agent for every page visit.
-- Files: `index.html:13-15`
-- Current mitigation: `crossorigin` attribute on the preconnect; no JS is served from these origins.
-- Recommendations: Add a `<meta http-equiv="Content-Security-Policy" content="...">` block restricting `font-src` to `https://fonts.gstatic.com` and `style-src` to `'self' https://fonts.googleapis.com 'unsafe-inline'` (Vite injects inline styles). For a fully self-contained build, vendor the Orbitron + Outfit fonts locally.
+**Innocuous `innerHTML` use, but worth noting:**
+- Risk: `labelDiv.innerHTML = ...` interpolates `star.displayName` and `star.params.radius` into HTML (`main.js:376-382`). Both originate from the in-code HYG table and the procedural classifier — not user input — so this is safe today.
+- Files: `src/js/main.js:376-382`
+- Current mitigation: Data is internal.
+- Recommendations: If a future feature lets the user name a star or imports a catalog, switch to `textContent` for name fields.
 
-**No CSP Configured:**
-- Risk: The HTML page ships with no CSP, no `X-Content-Type-Options`, no `Referrer-Policy`. While this is a client-only WebGL renderer with no remote data fetches besides fonts, future contributors might add `fetch()` calls (e.g., to a star catalog API) without realizing the page is unprotected.
-- Files: `index.html` (entire file)
-- Current mitigation: No dynamic HTML injection (`innerHTML` is never used in `src/`); `eval`/`Function` are absent.
-- Recommendations: Add a minimal CSP `<meta>` allowing only `'self'` for scripts and the fonts domain for styles.
+**`input-custom-class` is regex-validated before use:**
+- Risk: `parseMKClassification` regex (`stellarClassifier.js:55`) constrains user input. `lookupHYGStar` strips non-alphanumerics (`stellarClassifier.js:351`). Both feed into shader uniforms (numbers) and `displayName` (rendered via `innerHTML` in the label card).
+- Files: `src/js/stellarClassifier.js:55`, `:351`; `src/js/main.js:884-944`
+- Current mitigation: Regex and string sanitization.
+- Recommendations: Same as above — switch the label card to `textContent` to be safe against catalog injection.
 
-**User Input Surfaced Into DOM Without Validation:**
-- Risk: `applyCustomClass` reads `customInput.value` (`src/js/main.js:244`) and on success writes it to `hudStarClass.textContent` (`src/js/main.js:295`). `textContent` (not `innerHTML`) is used, which neutralizes any XSS payload. However, the input has no length cap, so a user could paste a 10 MB string and force a heavy regex match on `src/js/stellarClassifier.js:47`. The regex is anchored with `^...$` so it short-circuits quickly, but the `.toUpperCase()` and `.replace(/\s+/g, '')` on the full string still allocate.
-- Files: `src/js/main.js:244`, `src/js/stellarClassifier.js:41`
-- Current mitigation: `textContent` write is safe from XSS; regex is anchored.
-- Recommendations: Add `customInput.maxLength = 16` either on the HTML element (`index.html:70`) or programmatically.
+**Inline `<svg>` data URI in favicon and no CSP:**
+- Risk: `<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,...">` (`index.html:5`). No Content-Security-Policy meta tag. External Google Fonts loaded over HTTPS (`index.html:13-15`).
+- Files: `index.html:5`, `:13-15`
+- Current mitigation: None.
+- Recommendations: For a deployed build, add a `<meta http-equiv="Content-Security-Policy">` allowing only `'self'`, `fonts.googleapis.com`, `fonts.gstatic.com`, and inline styles (currently required by the inline `style=` attributes).
 
 ## Performance Bottlenecks
 
-**High-Polygon Spheres for the Prominence Shell:**
-- Problem: `promGeometry = new THREE.SphereGeometry(scale * 1.01, 140, 140)` (`src/js/sun.js:153`) yields ~39,000 vertices, each running a multi-octave Simplex noise vertex shader. The core sphere is 80×80 (~12,800 vertices). Combined with the corona plane and starfield (6,000 points), this is fine on desktop GPUs but will struggle on integrated mobile GPUs.
-- Files: `src/js/sun.js:130, 153`
-- Cause: Static high tessellation regardless of camera distance.
-- Improvement path: Implement LOD — swap to a 60×60 or 40×40 sphere when `camera.position.length() > 5000`; or use Three.js `LOD` helper.
+**Comparison mode renders 12 independent Three.js scenes per star:**
+- Problem: Each `new Sun(...)` creates three meshes with their own `THREE.SphereGeometry(100, 80, 80)` (12,800 verts), `THREE.SphereGeometry(101, 140, 140)` (39,200 verts), and a `THREE.PlaneGeometry`. With 12 stars: ~624k verts of sphere geometry and 36 `ShaderMaterial` instances (3 per star), each recompiled by Three.js.
+- Files: `src/js/sun.js:169-191`, `:194-218`, `:221-242`; `src/js/main.js:333-342`
+- Cause: No geometry sharing across instances; no `InstancedMesh`; no LOD; each star's prominence shell uses 140×140 segments regardless of screen size.
+- Improvement path:
+  1. Share a single `SphereGeometry(100, 80, 80)` and `SphereGeometry(101, 140, 140)` and `PlaneGeometry` module-scope; pass them into every `Sun` instance.
+  2. Materials are per-instance because uniforms differ per star, but reducing per-frame uniform churn would help — the inner loop at `sun.js:312-348` writes 4 uniforms every frame even when params are static.
+  3. Add LOD on the prominence shell — drop to 60×60 segments when angular size on screen is below a threshold. Same for `coreGeometry`.
+  4. The corona billboard (480×480 plane) blends additively with `depthWrite: false`; consider a smaller plane when the star fills <5% of viewport.
 
-**Per-Frame Heavy Shaders With No Distance-Based Quality Scaling:**
-- Problem: The surface fragment shader runs three `warpedFbm3D` calls (each = 3 octaves × value noise × warp = 27 noise samples per pixel). Plus sunspot and plage `fbm3D` (~6 more samples each). At 1080p, this is ~26 million noise samples per frame for the surface alone, and the framerate is not adaptive.
-- Files: `src/js/shaders.js:200-305`, `src/js/sun.js:130-148`
-- Cause: Shader complexity is constant; no LOD or fewer octaves at far distances.
-- Improvement path: Pass an `uQualityLevel` uniform driven by `camera.position.length()` and reduce FBM octaves (3 → 2 → 1) at distance.
+**Prominence sphere is 140×140 segments — high vertex count for a displacement target:**
+- Problem: `new THREE.SphereGeometry(101.0, 140, 140)` produces ~39k vertices per star → ~470k vertices total in the 12-star lineup just for prominences. Vertex shader runs simplex noise (~50 ALU per `snoise`, called 3× per vertex with polar jet) on every one.
+- Files: `src/js/sun.js:196`
+- Cause: Aggressive subdivision chosen for smooth displacement.
+- Improvement path: Reduce to 96×96 in comparison mode, or implement a per-star segment count tied to current `params.scale` (small stars don't need 140×140).
 
-**Corona Billboard Discards Roughly 75 Percent of Fragments:**
-- Problem: The corona plane (`src/js/sun.js:179`) is `coronaSize × coronaSize` (`scale * 4.8 * scale * 4.8`). The fragment shader discards everything outside `uvDist > 0.5` (a circle inscribed in the square — ~21 percent waste) and again everything inside `scaleDist < 0.416` (the core silhouette — another ~17 percent). That is overdraw of ~38 percent of the plane's pixels with shader work that ends in `discard`.
-- Files: `src/js/sun.js:179`, `src/js/shaders.js:421-440`
-- Cause: Square-plane billboard for a circular volumetric effect.
-- Improvement path: Use a circular geometry (`THREE.CircleGeometry` or a sphere mesh) or a tight quad with hardcoded UV bounds that exclude the core.
+**Frustum culling cannot help — every star is always inside the comparison lineup's bounding box:**
+- Problem: The lineup spans `accumulatedX` up to ~10⁶+ scene units (real-scale mode), and the camera flies through it. Three.js's per-mesh frustum culling will exclude offscreen meshes, which helps; however the per-frame `sun.update()` for all 12 stars (`main.js:1195-1197`) still runs uniform updates and rotates the group regardless of visibility.
+- Files: `src/js/main.js:1195-1197`; `src/js/sun.js:310-348`
+- Cause: No visibility check before `star.update(...)`.
+- Improvement path: Check `star.group.visible` and skip `update` when offscreen — or test against `camera.frustum` directly. Note that `Sun.update` mutates `group.scale` and `group.rotation` so a stopped star will visually freeze; that's acceptable for offscreen stars.
 
-**`UnrealBloomPass` Allocated Even When Disabled:**
-- Problem: `usePostProcessing = false` by default (`src/js/main.js:20`), yet `EffectComposer`, `RenderPass`, `UnrealBloomPass`, and `OutputPass` are constructed unconditionally during `init()` (lines 75-89). `UnrealBloomPass` allocates a chain of MIPmap render targets (~5 levels of half-resolution textures); on a 1080p screen this reserves ~6 MB of GPU memory that is unused. Worse, `updateAutoExposure` writes `bloomPass.strength = 0.0` every frame even in direct-render mode (line 335).
-- Files: `src/js/main.js:20, 75-89, 327-337`
-- Cause: Eager initialization.
-- Improvement path: Defer `composer`/`bloomPass` construction to first toggle of `useBloom`; or share the render targets with the main framebuffer.
+**12× lens-flare texture regeneration on focus change:**
+- Problem: `updateLensFlares()` (`sun.js:252-307`) destroys and re-creates three `CanvasTexture` instances per `Sun` instance. `updateComparisonLensFlares` (`main.js:578-584`) calls it for every star on every focus change.
+- Files: `src/js/sun.js:252-307`; `src/js/main.js:578-584`
+- Cause: Texture content depends on star temperature, but the actual canvas drawing is fast; the cost is the GPU upload (3 × 512×512 RGBA = 3 MB per star × 12 stars = 36 MB worst case).
+- Improvement path: Cache textures keyed by `(colorHex, type)` across stars and reuse; or compute the lens-flare color in a tiny lookup table at module load.
 
-**Bloom Pass Resize Independent of Renderer Resize:**
-- Problem: `onWindowResize` calls `renderer.setSize`, `composer.setSize`, and then `bloomPass.setSize(width/2, height/2)` separately (lines 416-420). The composer already manages internal pass sizes; manually overriding `bloomPass.setSize` after `composer.setSize` re-resets to half-resolution. This is correct but fragile.
-- Files: `src/js/main.js:412-421`
-- Cause: Two-step resize.
-- Improvement path: Subclass `UnrealBloomPass` to expose a `resolutionScale` and have it react to composer resize automatically.
+**Camera frustum is huge (`far: 30,000,000`) in comparison mode:**
+- Problem: `controls.maxDistance = 20000000.0; camera.far = 30000000.0` (`main.js:296-297`) gives a depth ratio of 30M:1 versus `camera.near = 1.0`. Depth-buffer precision suffers; flickering ("z-fighting") is likely on overlapping prominence/corona shells when zoomed out.
+- Files: `src/js/main.js:67`, `:296-298`
+- Cause: Real-scale mode pushes stars to astronomical separations.
+- Improvement path: Switch to a logarithmic depth buffer (`new THREE.WebGLRenderer({ logarithmicDepthBuffer: true })`) when entering comparison mode — only available at renderer construction, so the alternative is to set `camera.near` dynamically based on camera distance.
 
-**No `frustumCulled` Configuration on the Sun Group:**
-- Problem: Three.js auto-frustum-culls per-mesh, but the prominence and corona shells extend beyond their geometry's bounding sphere due to vertex displacement and shader scaling (`pulseScale = 1.0 + 0.02 * Math.sin(...)`). When the camera is at a steep angle, the bounding sphere may be culled before the rendered geometry is fully off-screen. The current `coreScaleDist = 0.416` hardcoded ratio (`src/js/shaders.js:435`) compounds this — if the bounding box test passes but the corona is mostly transparent, you still pay full overdraw.
-- Files: `src/js/sun.js:280`, `src/js/shaders.js:435`
-- Cause: Mesh `boundingSphere` does not reflect shader-displaced geometry.
-- Improvement path: Set `coreMesh.frustumCulled = false` and `promMesh.frustumCulled = false` (small scene, one star), or manually compute correct bounding spheres with displacement headroom.
+**`window.innerWidth / innerHeight` recomputed in the render loop:**
+- Problem: `aspect`, `fovRad`, `tanHalfFOV`, `effectiveTan` are recomputed every frame in `animate` (`main.js:1127-1130`) and again in `updateCinematicCamera` (`main.js:683-686`).
+- Files: `src/js/main.js:683-686`, `:1127-1130`
+- Cause: No cache; assumes the window can resize at any moment.
+- Improvement path: Cache these values, update only in `onWindowResize`.
 
-**Three.js Bundle Size — 626 KB Production JS:**
-- Problem: `dist/assets/index-Cc6hYQRo.js` weighs 626,461 bytes minified. The dependencies are `three@0.184.0` (~620 KB) plus `lil-gui@0.21.0` (~30 KB). The entire `three/examples/jsm` postprocessing chain is bundled even when `usePostProcessing = false` by default.
-- Files: `package.json:14-17`, `dist/assets/index-Cc6hYQRo.js`
-- Cause: Default Vite ESM tree-shaking includes everything reachable through static imports.
-- Improvement path: Lazy-import `EffectComposer`, `RenderPass`, `UnrealBloomPass`, `OutputPass` only when the user toggles `useBloom`; consider `three`'s upcoming `three/webgpu` build for slimmer modules; gzip currently brings this to ~165 KB, which is acceptable.
+**Bloom pass is half-res but still runs the full chain:**
+- Problem: `UnrealBloomPass` is correctly initialized at half resolution (`main.js:122`). However, `usePostProcessing` defaults to `false` (`main.js:20`), so bloom is off by default — and `bloomPass.strength` is still read every frame at `main.js:1196`, `:1199`, even when `composer.render()` isn't called.
+- Files: `src/js/main.js:20`, `:122`, `:1196`, `:1199`
+- Cause: `Sun.update(time, bloomStrength)` accepts the value but never uses it (see Tech Debt).
+- Improvement path: Drop the parameter, drop the read of `bloomPass.strength`.
 
-**Telemetry DOM Writes Every 100 ms Regardless of Visibility:**
-- Problem: `updateTelemetry` (`src/js/main.js:351-366`) writes to `valDistance.textContent`, `valVelocity.textContent`, `valTemperature.textContent` every 100 ms even when the HUD is collapsed (`#control-panel.collapsed`). DOM `textContent` writes trigger layout reflow on the HUD readout boxes.
-- Files: `src/js/main.js:351-366`, `src/js/main.js:395-398`
-- Cause: No visibility check.
-- Improvement path: Skip the write when the HUD is offscreen or collapsed (`controlPanel.classList.contains('collapsed')`).
+**Heavy `backdrop-filter: blur(16px) saturate(180%)` on multiple panels:**
+- Problem: HUD, control panel, and label cards all use `backdrop-filter` (`style.css:32-33`, `:49-50`, `:272-273`, `:577-578`). On low-end GPUs the blur of the whole composited area behind each panel is expensive — and the panel covers ~25% of the viewport.
+- Files: `src/style.css:32-33`, `:49-50`, `:272-273`, `:577-578`
+- Cause: Glassmorphism design.
+- Improvement path: Reduce blur radius to `8px`, or replace with a static semi-transparent background on mobile (already partial via media query at `style.css:520`).
+
+**46 `document.getElementById`/`querySelector` calls in `main.js`:**
+- Problem: Some lookups are cached at module load (`main.js:48-57`), but many are repeated inside event handlers (e.g. `document.getElementById('comparison-focus-panel')` at `main.js:304` and again at `:426`; `document.getElementById('btn-cinematic-flyby')` at `:306`, `:428`, `:649`, `:663`, `:869`).
+- Files: `src/js/main.js` (multiple lines)
+- Cause: Convenience over DOM-cache discipline.
+- Improvement path: Cache DOM nodes alongside the existing block at `main.js:48-57`.
 
 ## Fragile Areas
 
-**No WebGL Context Loss Handling:**
-- Files: `src/js/main.js:48-54`
-- Why fragile: `THREE.WebGLRenderer` is constructed without subscribing to `webglcontextlost`/`webglcontextrestored` events on `renderer.domElement`. If the GPU resets (driver crash, tab background-throttling, mobile suspend/resume), the canvas turns black permanently and the user must reload. All shader programs, textures, and buffers need re-upload.
-- Safe modification: Add listeners that call `renderer.dispose()` and rerun `init()` on restore. Three.js does some of this internally, but custom `ShaderMaterial` uniforms (`uTime`, etc.) need explicit reattachment.
-- Test coverage: None — there is no test suite at all in this repo.
+**Lineup index coupling across cinematic and choreography:**
+- Files: `src/js/main.js:318-331` (lineup definition), `:392` (`focusOnComparisonStar(2)` for Sol), `:672` (`focusOnComparisonStar(2)` for Sol after cinematic stop), `:678-682` (cinematic camera pos0/pos2/posLast), `:1156`/`:1166`/`:1176` (David & Goliath indices 0/2/7).
+- Why fragile: Reordering the `lineupData` array silently breaks every numeric index reference.
+- Safe modification: Always add stars to the end of the lineup; never reorder. Better, refactor to name-based lookup.
+- Test coverage: Zero — no test suite exists.
 
-**No `WebGLRenderer` Failure Fallback:**
-- Files: `src/js/main.js:48`
-- Why fragile: `new THREE.WebGLRenderer({...})` throws if the browser cannot create a WebGL context (older browsers, headless environments, GPU blacklist). The throw propagates out of `init()` and the loader screen never fades — the user sees `INITIALIZING STELLAR SHADERS...` forever with no error message.
-- Safe modification: Wrap in `try { ... } catch (err) { showFallbackMessage(err); }` and display a "WebGL not supported" overlay.
-- Test coverage: None.
+**Param state machine — `setPreset` saves current slot before switching, but conditionally:**
+- Files: `src/js/sun.js:504-529`
+- Why fragile: `setPreset` saves `this.params` into `this.presetStates[this.currentPresetName]` only if the slot already exists (`sun.js:506`). For an unrecognized preset name passed as a string, it returns without doing anything (no error, no fallback). For an object, it always switches into the `custom` slot.
+- Safe modification: Always pass a known preset name string or an object; never pass `undefined`.
+- Test coverage: Zero.
 
-**No `dispose()` Pathway for Scene Objects:**
-- Files: `src/js/sun.js:128-198`, `src/js/starfield.js:9-79`
-- Why fragile: `Sun` allocates four meshes (core, prominences, corona, flare group) with materials and geometries. Only the lens flare textures are disposed (`src/js/sun.js:214-217`). If the app were ever embedded as a widget that remounts (e.g., React with `useEffect`), every remount would leak the geometry, material, and shader program for the core, prominences, corona, and starfield. Currently a single-page-load app, so the leak does not manifest, but it is a future-foot-gun.
-- Safe modification: Add `Sun.dispose()` calling `geometry.dispose()` and `material.dispose()` on every owned object; similarly add an `unmount` path that removes the resize listener.
-- Test coverage: None.
+**Loader fade-out is a fixed 600ms timeout, unrelated to actual readiness:**
+- Files: `src/js/main.js:144-146`
+- Why fragile: `updateLoadProgress(100)` is called synchronously inside `init`, but the loader fade only triggers 600ms later. If shader compilation stalls (it can on first frame), the user sees a faded loader over a black canvas.
+- Safe modification: Fade after the first successful `animate()` frame, not a setTimeout.
+- Test coverage: Zero.
 
-**Animation Loop Cannot Be Stopped:**
-- Files: `src/js/main.js:369-410`
-- Why fragile: `animate()` calls `requestAnimationFrame(animate)` unconditionally with no stored handle. There is no way to pause or stop the loop (e.g., on tab visibility change). The browser will throttle to ~1 fps when the tab is backgrounded, but the loop still ticks, mutates `clock`, and re-renders. Slack telemetry timestamps will drift far when the tab is reactivated.
-- Safe modification: Store the handle (`const id = requestAnimationFrame(animate)`), expose a `stop()` that calls `cancelAnimationFrame(id)`, and listen for `document.visibilitychange`.
-- Test coverage: None.
+**No WebGL context-loss handler:**
+- Files: `src/js/main.js:71` (renderer creation, no context-loss listener)
+- Why fragile: Context loss (driver crash, tab backgrounding on some browsers) leaves textures/geometries unbound. The app has no path to re-initialize.
+- Safe modification: Don't background the tab for long periods on machines with intermittent GPUs.
+- Test coverage: Zero.
 
-**Global Module-Scope State With No Reset Path:**
-- Files: `src/js/main.js:15-26`
-- Why fragile: Eight `let`-bound module globals (`scene`, `camera`, `renderer`, `controls`, `gui`, `sun`, `starfield`, `composer`, `bloomPass`, `clock`, `timeSpeed`, etc.) plus `isFlying`/`flightTargetPos`/`flightTargetLookAt`/`flightSpeed`. Reloading the scene without a full page refresh is impossible.
-- Safe modification: Encapsulate into an `App` class with `mount(rootEl)` / `unmount()` lifecycle methods.
-- Test coverage: None.
+**No WebGL2 capability check:**
+- Files: `src/js/main.js:71`
+- Why fragile: `THREE.WebGLRenderer` falls back to WebGL1 on browsers/devices without WebGL2; the GLSL in `shaders.js` doesn't require `#version 300 es` features, so it will technically run — but the assumption stated in the title ("WebGL 2 Simulation") goes silently false.
+- Safe modification: Test in `if (!renderer.capabilities.isWebGL2) { /* warn */ }`.
+- Test coverage: Zero.
 
-**Loader Screen Hidden on a Fixed 600 ms Timer Regardless of Init Result:**
-- Files: `src/js/main.js:100-102`
-- Why fragile: The loader fade-out is `setTimeout(..., 600)` and is unconditional. If `init()` succeeds in 50 ms (cached page reload), the loader still displays for 600 ms. If `init()` throws between `updateLoadProgress(100)` and the timer (very narrow window), the loader still hides but the page is broken.
-- Safe modification: Trigger fade-out at the end of the first `animate()` frame instead of via timer.
-- Test coverage: None.
+**`flightSpeed = 0.035` lerp factor is frame-rate dependent:**
+- Files: `src/js/main.js:32`, `:1092-1093`
+- Why fragile: `camera.position.lerp(flightTargetPos, flightSpeed)` advances the same fraction per frame regardless of `delta`. At 30 FPS the autopilot is half as fast as at 60 FPS.
+- Safe modification: Use `1 - Math.exp(-flightSpeed * delta * 60)` or similar frame-rate-independent damping.
+- Test coverage: Zero.
 
-**`onWindowResize` Has No `composer`/`bloomPass` Existence Guard:**
-- Files: `src/js/main.js:412-421`
-- Why fragile: Calls `composer.setSize` directly; if `init()` ever moves construction order or partially fails, a resize throws.
-- Safe modification: `if (composer) composer.setSize(...); if (bloomPass) bloomPass.setSize(...);`.
-- Test coverage: None.
+**`controls.enabled = false` during cinematic, but window-resize can still affect target:**
+- Files: `src/js/main.js:644`, `:661`; `:1216-1225`
+- Why fragile: Resizing during cinematic re-runs `onWindowResize`, which calls `camera.updateProjectionMatrix()`. The cinematic uses cached `effectiveTan` per frame — but a resize mid-Take 2 will change `tanHalfFOV` and snap star positions to new screen-fill targets, visible as a jump.
+- Safe modification: Avoid resizing during the flyby; or restart the active Take on resize.
+- Test coverage: Zero.
 
-**`OrbitControls.minDistance` Tied to Hardcoded Magic `140.0 * scale`:**
-- Files: `src/js/main.js:60, 194, 273`
-- Why fragile: Three different code paths (init, preset button, custom-class) each rewrite `controls.minDistance = 140.0 * sun.params.scale`. The hardcoded `140.0` should be derived from `sun.params.scale * 1.4` or similar — currently it ignores the prominence shell radius (`scale * 1.01`) and lets the camera clip inside the prominence sphere on certain settings.
-- Safe modification: Encapsulate as `Sun.getMinSafeCameraDistance()` returning a computed value.
-- Test coverage: None.
+**Cinematic `Take 2` and `Take 3` have a 1-second gap (16.0s vs lineup re-converge at 6.0s):**
+- Files: `src/js/main.js:1139-1146` (assembly ends at 6.0, eclipse starts at 7.0); `:701-709` (eclipse 7.0-16.0); `:711-739` (canyon 16.0-27.0)
+- Why fragile: Between 6.0s and 7.0s, stars are at base positions but the camera in `updateCinematicCamera` is still on Take 1 (which ends at 7.0). Between Take 2 end (16.0) and Take 3 start (16.0) is the boundary — fine. Between assembly (6.0) and Take 2 (7.0), star choreography is idle for 1 second.
+- Safe modification: Document and intentional, or align the boundaries.
+- Test coverage: Zero.
 
 ## Scaling Limits
 
-**Single-Star Scene by Design:**
-- Current capacity: 1 procedural star + 1 starfield (6000 points) + 1 lens flare system.
-- Limit: The `Sun` class is a singleton-ish — `main.js` holds one `sun` global. Multi-star scenes (e.g., a binary system) would require duplicating the entire `Sun` instantiation, doubling GPU shader cost.
-- Scaling path: Refactor `Sun` to accept a `position` and allow multiple instances; share shader programs across instances; consider instanced rendering for many distant stars.
+**12 stars is the current ceiling for comparison mode:**
+- Current capacity: 12 `Sun` instances × 3 meshes each = 36 active meshes, 36 ShaderMaterial compiles, ~624k sphere verts, 12 lens flare sets.
+- Limit: At ~20 stars, frame budget for the prominence shell vertex shader (39k verts × 20 × simplex noise) will exceed 16 ms on integrated GPUs.
+- Scaling path: Geometry sharing (one shared `SphereGeometry` per layer), LOD, and per-star visibility skipping in `animate()` (see Performance Bottlenecks).
 
-**Hardcoded Camera Far Plane of 500,000 Units:**
-- Current capacity: 500,000 units (`src/js/main.js:44`), with starfield shell at 25,000-35,000 and `controls.maxDistance = 150,000` (`src/js/main.js:61`).
-- Limit: The depth buffer precision at this near/far ratio (1.0 to 500,000) is poor. Z-fighting is possible between the starfield (z ≈ 30,000) and the corona (z ≈ 480 at default scale). Currently masked by `depthWrite: false` on the corona and starfield.
-- Scaling path: Use a logarithmic depth buffer (`renderer = new THREE.WebGLRenderer({ logarithmicDepthBuffer: true })`); reduce far plane.
+**Starfield: 6000 points is fine; bumping to 50k would hurt:**
+- Current capacity: 6000 `THREE.Points` with custom shader (`main.js:114`).
+- Limit: Each point runs a per-fragment exp/sin for twinkle (`shaders.js:534-535`); ~6000 well-separated points at 1080p is GPU-cheap. 50k starts to fill rate.
+- Scaling path: Reduce per-point pixel coverage by lowering `gl_PointSize` ceiling (`shaders.js:516`).
 
-**`devicePixelRatio` Capped at 2.0:**
-- Current capacity: `renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))` (`src/js/main.js:50`).
-- Limit: On 4K/5K Retina displays, this means a 4096×2160 viewport renders at 4096×2160 (DPR 2 of 1920×1080), but high-DPR phones can hit DPR 3 or 4 — rendering would still be at 2x. This is actually a good performance choice; flagging only because the user has no way to override for a quality-first preview.
-- Scaling path: Expose `pixelRatioCap` in the GUI; document the rationale.
+**Depth precision degrades at high `camera.far`:**
+- Current capacity: `camera.far = 30,000,000` works in single mode (`main.js:67` uses 500,000).
+- Limit: At 30M with `near = 1.0`, depth-buffer precision near small white dwarfs is ~10 units — barely enough to separate prominence shell (radius 101) from core (radius 100).
+- Scaling path: Logarithmic depth buffer or dynamic `near`/`far` tightening.
 
 ## Dependencies at Risk
 
-**`three@^0.184.0` Major-Version Churn:**
-- Risk: Three.js ships breaking changes roughly every 6-8 months. `^0.184.0` allows automatic upgrade through `0.x` minors but with `0.x` versions, `^` is treated as `~` by npm (only patches). Still, the `examples/jsm` paths (OrbitControls, EffectComposer, UnrealBloomPass, Lensflare) have moved across recent versions.
-- Impact: A `npm install` on a fresh clone could pick up `0.184.x` patches that change the lens flare API, breaking `src/js/sun.js:248-260`.
-- Migration plan: Pin to an exact version (`"three": "0.184.0"`) in `package.json`. Re-test against newer minors in a separate branch.
+**Three.js `^0.184.0` (carat range allows minor bumps):**
+- Risk: Three.js makes breaking changes between minor versions (e.g. r140s changed `OutputPass` import paths; r150+ changed color-space defaults).
+- Files: `package.json:16`
+- Impact: A future `npm install` could land on r185+ with `WebGLRenderer.outputColorSpace` defaults changing the tone of the lens flares.
+- Migration plan: Pin to `0.184.x` (`~0.184.0`) until tested with a newer version.
 
-**`vite@^8.0.12`:**
-- Risk: Vite 8 is recent; major-version upgrades historically broke plugin compatibility.
-- Impact: A future `vite@9` may break the implicit dev/build pipeline.
-- Migration plan: Pin major version range (`"vite": "^8.0.0"` is fine; consider `~8.0.0` to avoid 8.1 surprises if any).
+**`lil-gui ^0.21.0`:**
+- Risk: Active library, occasional breaking style changes (the project's CSS overrides at `style.css:332-388` depend on internal class names like `.controller`, `.fill`, `.slider`).
+- Files: `package.json:15`, `src/style.css:332-388`
+- Impact: A lil-gui update that renames CSS classes will leave the control panel unstyled.
+- Migration plan: Pin to `~0.21.0`.
 
-**`lil-gui@^0.21.0`:**
-- Risk: Pre-1.0 library; API changes in `0.x` minors.
-- Impact: `gui.folders.forEach(folder => folder.controllers.forEach(c => c.updateDisplay()))` (`src/js/main.js:309-314`) relies on `folders` and `controllers` arrays existing. Renamed in earlier versions.
-- Migration plan: Pin to `0.21.x`.
-
-**No `engines` field in `package.json`:**
-- Risk: No specified Node version, no `engines`, no `.nvmrc`.
-- Impact: Vite 8 requires Node 22+ to build; contributors on Node 18 silently fail.
-- Migration plan: Add `"engines": { "node": ">=22" }` and an `.nvmrc`.
+**`vite ^8.0.12` (dev-only):**
+- Risk: Vite 8 is acceptable; no production runtime impact.
+- Files: `package.json:12`
+- Impact: Build-time only.
+- Migration plan: None needed.
 
 ## Missing Critical Features
 
-**No Asset Preloading or Loading Manager:**
-- Problem: The loader bar at `index.html:104-106` is animated by `updateLoadProgress(30/60/80/100)` (`src/js/main.js:64, 68, 72, 97`) called at fixed milestones — it does not actually track loading of anything. No textures or models are loaded from disk; the entire scene is procedural. The "progress bar" is a visual prop.
-- Blocks: Honest user feedback during initialization. If shader compilation becomes slow, the user sees no indicator.
-- Recommendation: Either remove the progress bar or hook it to `THREE.DefaultLoadingManager` once external assets exist; alternatively, measure shader-compile time via `renderer.compile(scene, camera)` and report real progress.
+**No automated tests:**
+- Problem: No test runner configured, no test files exist anywhere in the repo (excluding `node_modules`).
+- Blocks: Refactoring of `main.js` cannot be verified; `parseMKClassification` and `kelvinToColorGrading` have well-defined numeric inputs/outputs and would benefit greatly from unit tests.
 
-**No Error Display UI:**
-- Problem: There is no error overlay, no `try/catch` around `init()`, no `unhandledrejection` listener. Any failure (WebGL unsupported, shader compile error, geometry NaN) leaves the page in a broken state with messages only in DevTools.
-- Blocks: Diagnosing user-reported issues remotely.
-- Recommendation: Add a top-level `try/catch` in `init`, plus `window.addEventListener('error', ...)` and `window.addEventListener('unhandledrejection', ...)` that surface a banner in the loader screen.
+**No build/CI configuration:**
+- Problem: No `.github/`, no `.gitlab-ci.yml`, no CI hooks. `npm run build` is local-only.
+- Blocks: No regression check, no preview deploy, no lint.
 
-**No Mobile/Touch Affordances:**
-- Problem: The HUD has fixed pixel widths (`#space-hud { width: 380px }` per `src/style.css:45`). The control panel uses `lil-gui` which is keyboard/mouse-first. No touch-action CSS and no orientation-change handling beyond the resize listener.
-- Blocks: Mobile users.
-- Recommendation: Either explicitly target desktop and warn mobile users, or add responsive media queries and `OrbitControls`'s touch-rotation tuning.
+**No lint/format configuration:**
+- Problem: No `.eslintrc*`, no `.prettierrc`, no formatter is enforced.
+- Blocks: Style drift across modules — already visible: some functions are double-spaced, some use `// 1.` numbered comments, some lines exceed 200 chars (e.g. `main.js:488`).
 
-**No Frame-Rate Cap or VSync Awareness:**
-- Problem: On a 240 Hz display the simulation runs 4x faster than on 60 Hz because `clock.getDelta()` is multiplied by `timeSpeed` (`src/js/main.js:373`). The result is consistent in seconds but the visual feel of `convectionSpeed` etc. shifts per monitor.
-- Blocks: Cross-display visual consistency.
-- Recommendation: Fix the simulation timestep (e.g., always advance by `delta` capped at 1/30) or document the per-Hz tuning.
+**No error boundary / user-facing error UI:**
+- Problem: A shader compile failure on an exotic GPU will silently leave a black canvas. The loader's "INITIALIZING STELLAR SHADERS..." text persists with 100% progress but no visible scene.
+- Blocks: Diagnosing user issues in the wild.
+
+**No `requestAnimationFrame` cancellation on tab hide:**
+- Problem: `requestAnimationFrame(animate)` runs unconditionally (`main.js:1082`). When the tab is hidden, the browser already throttles, but the simplex noise still computes for an invisible scene.
+- Blocks: Battery life on laptops.
+- Fix path: `document.addEventListener('visibilitychange', ...)` to pause the loop.
 
 ## Test Coverage Gaps
 
-**No Test Suite Exists:**
-- What's not tested: Everything. There is no `package.json` test script, no `tests/`, `__tests__/`, `*.test.*`, `*.spec.*` files anywhere. No `jest`, `vitest`, `mocha`, `playwright`, or any test runner in `devDependencies`.
-- Files: `package.json` (no `test` script in `scripts`)
-- Risk: Refactoring `parseMKClassification` or `kelvinToColorGrading` could silently break the input handling with no signal until a user types a spectral class.
-- Priority: Medium — for a pure-render demo project, the cost/value of full coverage is low, but `stellarClassifier.js` is a pure-function module that is trivially testable and would catch regex regressions.
+**`parseMKClassification` (`stellarClassifier.js:47-327`):**
+- What's not tested: 9-branch spectral-class temperature math, 6-branch luminosity-class scale/convection/oblateness math, edge cases like "O0Ia" (would compute `mass = 80 - 0*5 = 80` then scale to `max(20, 160) = 160`).
+- Files: `src/js/stellarClassifier.js`
+- Risk: A typo in any of the magic-number tables silently produces wrong star physics; nothing flags it.
+- Priority: High — this is the most logic-heavy, pure-function file in the codebase and is the lowest-hanging fruit for unit tests.
 
-**No Linting or Type Checking:**
-- What's not tested: No ESLint, no Prettier, no TypeScript, no JSDoc type checking.
-- Files: Root project (no `.eslintrc*`, no `tsconfig.json`, no `biome.json`)
-- Risk: Typos in uniform names (`uHighTemp` vs `uHightemp`) silently fail at shader-link time with a console warning that is easy to miss.
-- Priority: Medium — adding `eslint` + `@typescript-eslint` with `// @ts-check` in `main.js` would catch most class-of-bug issues for ~30 minutes of setup.
+**`kelvinToColorGrading` (`stellarClassifier.js:4-41`):**
+- What's not tested: Temperature → RGB clipping curve; the cool-star adjustment branch (`< 4000K`).
+- Files: `src/js/stellarClassifier.js:4-41`
+- Risk: Same as above.
+- Priority: High.
 
-**Specific Untested Modules:**
-- `src/js/stellarClassifier.js:39-191` (`parseMKClassification`): Regex parser with ~150 branches based on spectral class × luminosity class. Trivially unit-testable; currently relies on visual inspection.
-- `src/js/stellarClassifier.js:212-236` (`lookupHYGStar`): Star database lookup. Hand-typed entries — typos in `HYG_DATABASE` would only be caught by manual click-through.
-- `src/js/stellarClassifier.js:4-33` (`kelvinToColorGrading`): Pure function with magic constants; trivial to test against known temperatures.
+**`lookupHYGStar` (`stellarClassifier.js:350-404`):**
+- What's not tested: Per-star overrides for VEGA, ALTAIR, BETELGEUSE, ANTARES, RIGEL, DENEB.
+- Files: `src/js/stellarClassifier.js:350-404`
+- Risk: A typo in the override block silently affects only one star.
+- Priority: Medium.
+
+**`Sun.copyParams` and `Sun.setPreset` state machine (`sun.js:129-141`, `:504-529`):**
+- What's not tested: Round-trip of params through `presetStates` slots, custom→preset→custom switching.
+- Files: `src/js/sun.js:129-141`, `:504-529`
+- Risk: A regression in preset switching is the most likely user-visible bug.
+- Priority: Medium.
+
+**`updateComparisonLayout` spacing math (`main.js:501-576`):**
+- What's not tested: Two scale modes (visual log, real linear) produce non-overlapping layouts for the 12-star lineup.
+- Files: `src/js/main.js:501-576`
+- Risk: Adding or resizing a star could cause overlap that is only caught visually.
+- Priority: Low — visual QA catches it.
+
+**Cinematic timeline takes (`main.js:675-759`, `:1137-1186`):**
+- What's not tested: Each Take's boundary conditions, screen-fill math at extreme aspect ratios.
+- Files: `src/js/main.js:675-759`, `:1137-1186`
+- Risk: Aspect-ratio bugs (e.g. ultrawide) hide stars off-screen during eclipse.
+- Priority: Low — visual QA.
+
+## Platform & Build Concerns
+
+**Project is hosted in OneDrive-synced directory:**
+- Risk: `C:\Users\fgfer\OneDrive\Documents\GitHub\Projeto Render 3d Sol Webgl2` — files are subject to OneDrive sync. `node_modules/` (typically thousands of small files) can trigger sync conflicts, slow builds, and "file in use" errors during `npm install`.
+- Files: Project root.
+- Impact: Build instability, slower iteration; OneDrive may upload `node_modules/` unnecessarily.
+- Mitigation: Add `node_modules` to OneDrive exclusion list (right-click → "Always keep on this device" off, or use "Files On-Demand" with explicit exclusion). Better, move the working repo outside OneDrive.
+
+**Path with spaces (`"Projeto Render 3d Sol Webgl2"`):**
+- Risk: Some CLI tools and scripts mishandle paths with spaces. Vite handles it fine; npm scripts handle it fine; but ad-hoc bash/PowerShell commands need quoting.
+- Files: Project root.
+- Impact: Friction for CI integrations and CLI tooling.
+- Mitigation: Rename to `projeto-render-3d-sol-webgl2` if portability becomes a concern.
+
+**Bundle size — `dist/assets/index-DjpY_CxB.js` is ~645 KB minified:**
+- Risk: Three.js (`~600 KB` minified) dominates. The app code itself is small.
+- Files: `dist/assets/index-DjpY_CxB.js`
+- Impact: First-load cost on slow networks.
+- Mitigation: Use Three.js tree-shaking-friendly imports (already in place via `examples/jsm/` direct imports); consider lazy-loading post-processing only when `usePostProcessing` flips on.
 
 ---
 

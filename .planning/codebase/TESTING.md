@@ -2,283 +2,145 @@
 
 **Analysis Date:** 2026-05-20
 
-> **Status: NO TESTS EXIST.** This project has no test framework configured, no test files, and no testing infrastructure. The sections below document the current (empty) state honestly, then offer concrete recommendations for adding tests to a Three.js / WebGL2 application of this shape.
+> **Verdict: There is no test infrastructure of any kind in this project.**
+>
+> - No `*.test.*` or `*.spec.*` files exist anywhere in the repository (confirmed via glob across `src/`, `public/`, `dist/`, root).
+> - `package.json` defines only three scripts — `dev`, `build`, `preview` — none for testing.
+> - **No test runner is installed.** Neither `devDependencies` nor `dependencies` in `package.json` include Vitest, Jest, Mocha, Tape, Playwright, Cypress, Puppeteer, or any other testing framework. The only dev dependency is `vite ^8.0.12`.
+> - No test configuration files (`vitest.config.*`, `jest.config.*`, `playwright.config.*`, `cypress.config.*`) exist.
+> - No CI workflow files (`.github/workflows/`, `.gitlab-ci.yml`, etc.) exist.
+> - No coverage thresholds or coverage tooling are configured.
+> - No assertion helpers, fixtures, or mocks have been written.
+> - No manual smoke-test checklist or QA documentation has been written.
+>
+> Verification & maintenance of behaviour today is **purely visual / manual** by running `npm run dev` and inspecting the WebGL canvas, the HUD telemetry, and the lil-gui parameter panel.
 
 ## Test Framework
 
-**Runner:** **None.**
+**Runner:** None installed.
 
-- No `jest.config.*`, `vitest.config.*`, `karma.conf.*`, `playwright.config.*`, `cypress.config.*`, or `mocha.opts` in the project
-- No `test`, `spec`, `vitest`, `jest`, `mocha`, `playwright`, `cypress`, `puppeteer`, `@testing-library/*`, `chai`, or `sinon` entries in `package.json` `dependencies` or `devDependencies`
-- `package.json` (`package.json:6-10`) defines only three scripts and they are all build/run operations, not tests:
-  ```json
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  }
-  ```
-- No `npm test` script defined; running `npm test` falls back to the default npm "no test specified" error
+**Assertion Library:** None.
 
-**Assertion Library:** **None.**
+**Run Commands:** None defined.
 
-**Run Commands:** **None applicable.** The closest thing to validation is manual:
-```bash
-npm run dev      # Start Vite dev server, eyeball the rendering at http://localhost:5173
-npm run build    # Produce a production bundle (catches syntax errors, missing imports)
-npm run preview  # Serve the built bundle to sanity-check production output
+The full `scripts` section of `package.json` is:
+```json
+"scripts": {
+  "dev": "vite",
+  "build": "vite build",
+  "preview": "vite preview"
+}
 ```
 
 ## Test File Organization
 
-**Location:** No test files in the repository.
-
-- `Glob **/*.{test,spec}.{js,ts}` → **0 results**
-- `Glob {test,tests,__tests__,spec,specs}/**/*` → **0 results**
-- No `tests/` directory; no co-located `*.test.js` files
-
-**Naming:** No convention exists yet. If tests are added, the natural choices given the rest of the codebase would be:
-- Co-located: `src/js/stellarClassifier.test.js` next to `src/js/stellarClassifier.js`
-- Or grouped: `tests/stellarClassifier.test.js`
-
-**Structure:** Not applicable — no tests exist.
+Not applicable — no tests exist.
 
 ## Test Structure
 
-Not applicable. No reference patterns established in this codebase.
+Not applicable.
 
 ## Mocking
 
-Not applicable. No mocking framework, no test doubles, no fixtures.
+Not applicable.
 
 ## Fixtures and Factories
 
-Not applicable. No fixtures exist.
+Not applicable. The closest thing to "test fixtures" in the code are:
+- The four canned star presets defined in `Sun#getPresetDefaultSettings(presetName)` (`src/js/sun.js:351-456`) — `sol`, `redgiant`, `bluesuper`, `whitedwarf`.
+- The 17-entry `HYG_DATABASE` of real catalog stars in `src/js/stellarClassifier.js:329-348` (Sirius A/B, Betelgeuse, Vega, Polaris, Antares, Deneb, Altair, UY Scuti, etc.).
+- The `lineupData` array used to populate Comparison Mode in `src/js/main.js:318-331` (12 stars).
 
-**Note:** The closest thing to a "fixture" in the codebase is the hard-coded `HYG_DATABASE` object in `src/js/stellarClassifier.js:193-210`, which holds reference star data (Sirius, Betelgeuse, Vega, Rigel, etc.). This could serve as expected-value input for future tests of `lookupHYGStar`.
+These are usable as known-good inputs / expected baselines if and when tests are introduced.
 
 ## Coverage
 
-**Requirements:** None enforced. No coverage tool configured, no coverage threshold defined.
+**Requirements:** None enforced.
 
-**View Coverage:** Not applicable until a runner is added.
+**View Coverage:** Not available.
 
 ## Test Types
 
-**Unit Tests:** **None.**
+**Unit Tests:** None.
 
-**Integration Tests:** **None.**
+**Integration Tests:** None.
 
-**E2E Tests:** **None.** No Playwright, Cypress, Puppeteer, WebDriverIO, or Selenium configuration.
-
-**Visual Regression Tests:** **None.** No reference images checked in, no screenshot diff tooling (Percy, Chromatic, Loki, BackstopJS, etc.).
-
-**Performance Tests:** **None.** No frame-rate budget tests; the codebase relies on developer-side comments like `// Half-resolution for 75% GPU fill-rate savings` (`src/js/main.js:78`) and `// Optimized to 3-octaves for 60+ FPS` (`src/js/shaders.js`).
-
-## Common Patterns
-
-Not applicable. No tests to reference.
+**E2E Tests:** None.
 
 ---
 
-## Recommendations for Adding Tests
+## Recommended Testing Approach
 
-The codebase is small (5 JS modules, ~1000 lines) and unlikely to need exhaustive coverage. But several modules are highly testable in isolation, and a Three.js WebGL2 app benefits from a layered testing strategy. Below is a pragmatic plan tailored to this project.
+If tests are to be introduced, **the path of least resistance and highest immediate value is unit-testing the pure-logic modules first** — chiefly `src/js/stellarClassifier.js`. The Three.js-bound code in `src/js/sun.js`, `src/js/starfield.js`, and most of `src/js/main.js` requires a WebGL context or DOM and is much harder to test.
 
-### Tier 1 — Pure-JS unit tests (highest ROI, easiest to set up)
+### Tier 1 — Pure logic (highest leverage, easiest to test)
 
-The following modules contain pure math/parsing logic with no DOM or WebGL dependency. They can be unit-tested with a JS-only runner.
+**Target file:** `src/js/stellarClassifier.js` (404 lines, **the most testable file in the project**).
 
-**Recommended framework: Vitest**
-- Reasoning:
-  - Vitest is ESM-native (matches `"type": "module"` in `package.json`)
-  - Same Vite config it would inherit — zero new build config
-  - Jest-compatible API (`describe`, `it`, `expect`) for low learning curve
-  - Run command: add `"test": "vitest"` and `"test:run": "vitest run"` to `package.json`
+**Why this is the right starting point:**
+- Three pure exported functions (`kelvinToColorGrading`, `parseMKClassification`, `lookupHYGStar`) — no DOM, no WebGL, no global state.
+- One pure data export (`HYG_DATABASE`).
+- The only Three.js dependency is `THREE.Vector3` as a value container — easy to import in a node-side test runner.
+- All three functions have well-defined input domains and deterministic outputs.
+- The functions encode real domain knowledge (Morgan-Keenan spectral classification, Stefan-Boltzmann luminosity, blackbody color) — regressions would be silent and visually subtle, so tests pay back fast.
 
-**Install:**
-```bash
-npm install -D vitest
-```
+**Concrete unit-test ideas:**
 
-**High-value targets in this codebase:**
+For `parseMKClassification(spectralString)` (`stellarClassifier.js:47-327`):
+- **Happy-path cases per spectral class:** `'G2V'` → `specClass === 'G'`, `lumClass === 'V'`, `baseTemp ≈ 5840`, `scale ≈ 1.0`, `mass ≈ 0.99`.
+- **Each preset string:** `'G2V'`, `'M5III'`, `'O5I'`, `'DA2'` should each yield distinct, plausible parameters (these match the four preset buttons in the HUD).
+- **Subclass defaulting:** Inputs without a digit (e.g. `'G'`) should default subclass to `5` — assert that.
+- **Luminosity-class defaulting:** Inputs without a luminosity suffix (e.g. `'G2'`) should default to `'V'` — assert that.
+- **White-dwarf override:** `'DA2'`, `'DB5'` should force `lumClass === 'VII'`, `scale === 0.35`, `prominenceHeight === 0.0`, `coronaDensity === 0.0`, `sunspotThreshold === -0.5`.
+- **Supergiant detection:** `'O5Ia'`, `'M2I'`, `'F7Ib'` should set `isSupergiant`-derived params (mass floor of 20, pulse > 0 only for non-OB).
+- **Invalid input:** `'Z9X'`, `''`, `'INVALID'` should return `null`.
+- **Whitespace / case tolerance:** `'  g2v  '`, `'g2V'`, `'G 2 V'` should all parse to the same result as `'G2V'` (`stellarClassifier.js:49`).
+- **Bounds clamping:** Verify `baseTemp` never exceeds `[2000, 50000]` regardless of input.
 
-1. **`src/js/stellarClassifier.js`** — the single most testable module.
-   - `parseMKClassification(spectralString)` — pure regex + branch logic, returns a settings object or `null`
-     - Test valid inputs: `"G2V"` → expected `highTemp ≈ 5840 * 1.1`, `scale = 1.0`, `coronaDensity = 0.95`
-     - Test edge cases: `"o5i"` (lowercase), `"M5III"` (red giant scale), `"DA2"` (white dwarf — `lumClass = 'VII'`, `prominenceHeight = 0.0`)
-     - Test invalid inputs: `""`, `"XYZ"`, `"123"`, `"G99V"` → `null`
-     - Test default subclass fallback: `"GV"` → `subclass = 5`
-     - Test luminosity-class branches: `'I'`, `'III'`, `'IV'`, `'V'`, `'VI'`, `'VII'`, `'IA'`, `'IB'`
-   - `lookupHYGStar(nameQuery)` — hash lookup + scale calculation
-     - Test name normalization: `"sun"`, `"Sirius A"`, `"sirius a"`, `"sirius-a"` all resolve correctly
-     - Test scale compression bounds: should always be in `[0.35, 2.8]` for every entry in `HYG_DATABASE`
-     - Test miss path: `"NotARealStar"` → `null`
-   - `kelvinToColorGrading(temp)` — Vector3 conversion
-     - Test boundary temperatures: `2000`, `5778` (Sun), `10000`, `25000`, `50000`
-     - Assert returned `THREE.Vector3` components are in `[0, 1]` after clamping/normalization
-     - Assert warm bias for low temps (`r > b`), blue bias for high temps (`b > r`)
+For `kelvinToColorGrading(temp)` (`stellarClassifier.js:4-41`):
+- **Returns a `THREE.Vector3`** with each component in `[0.1, 1.25]` (post-normalization).
+- **Hot stars (`temp > 10000`)** have `z >= x` (blue-shifted).
+- **Cool stars (`temp < 4000`)** have `x > y > z` (red-shifted) and `z <= 0.38`.
+- **Boundary cases:** `temp = 6600` (around the t=66 branch in the algorithm), `temp = 5800` (Sol).
 
-   **Example test sketch** (`src/js/stellarClassifier.test.js`):
-   ```js
-   import { describe, it, expect } from 'vitest';
-   import { parseMKClassification, lookupHYGStar, HYG_DATABASE } from './stellarClassifier.js';
+For `lookupHYGStar(nameQuery)` (`stellarClassifier.js:350-404`):
+- **Each catalog key resolves:** Loop over `Object.keys(HYG_DATABASE)`, assert non-null return and that returned `mass`, `radius`, `lum`, `vRot` match the database entry.
+- **Case / punctuation tolerance:** `'sirius a'`, `'SIRIUS-A'`, `' SIRIUSA '` should all hit the `SIRIUSA` entry.
+- **Unknown names return `null`:** `'Tatooine'`, `''`, `'   '`.
+- **Vega override applied:** Asserts the `oblateness === 0.83` and `polarJetIntensity === 0.4` branches at `stellarClassifier.js:383-386`.
+- **Visual-scale compression:** `radius=1700` (UY Scuti) should be clamped via `Math.min(1.6, ...)` so `scale <= 2.6`.
 
-   describe('parseMKClassification', () => {
-     it('parses Sol-like G2V correctly', () => {
-       const result = parseMKClassification('G2V');
-       expect(result).not.toBeNull();
-       expect(result.scale).toBe(1.0);
-       expect(result.coronaDensity).toBeCloseTo(0.95);
-     });
+### Tier 2 — Lightly DOM-coupled logic
 
-     it('flags white dwarfs as scale 0.35 with no corona', () => {
-       const result = parseMKClassification('DA2');
-       expect(result.scale).toBe(0.35);
-       expect(result.coronaDensity).toBe(0.0);
-       expect(result.prominenceHeight).toBe(0.0);
-     });
+If a test runner is already set up, the following also tests reasonably with a JSDOM-style environment:
 
-     it('returns null for malformed input', () => {
-       expect(parseMKClassification('not-a-class')).toBeNull();
-       expect(parseMKClassification('')).toBeNull();
-     });
+- `Sun#copyParams(source, target)` (`src/js/sun.js:129-141`) — pure data-cloning helper, properly handles `THREE.Vector3` references. Testable without WebGL: instantiate two plain objects (or vector-shaped objects) and assert deep equality after copy.
+- `Sun#getPresetDefaultSettings(presetName)` (`src/js/sun.js:351-456`) — returns a plain object for each of the 4 preset names; pure function aside from the `new THREE.Vector3(...)` instantiation.
+- `Sun#getDefaultParams()` (`src/js/sun.js:96-127`) — pure object literal builder.
 
-     it('is case-insensitive and trims whitespace', () => {
-       expect(parseMKClassification('  g2v  ')).toEqual(parseMKClassification('G2V'));
-     });
-   });
+**Limitation:** The full `Sun` constructor calls `THREE.SphereGeometry`, `THREE.ShaderMaterial`, etc., which require either a real WebGL context (headless-gl, Playwright) or careful mocking. Don't try to unit-test the full class — extract pure helpers into their own module first if you need that coverage.
 
-   describe('lookupHYGStar', () => {
-     it('finds Sirius regardless of formatting', () => {
-       const a = lookupHYGStar('Sirius A');
-       const b = lookupHYGStar('siriusa');
-       expect(a).not.toBeNull();
-       expect(a.displayName).toContain('Sirius');
-       expect(a).toEqual(b);
-     });
+### Tier 3 — Visual / WebGL-coupled
 
-     it('compresses every catalog entry into visual scale [0.35, 2.8]', () => {
-       for (const key of Object.keys(HYG_DATABASE)) {
-         const result = lookupHYGStar(key);
-         if (result) {
-           expect(result.scale).toBeGreaterThanOrEqual(0.35);
-           expect(result.scale).toBeLessThanOrEqual(2.8);
-         }
-       }
-     });
-   });
-   ```
+`src/js/main.js`, `src/js/sun.js` (construction + uniform updates), `src/js/starfield.js`, and `src/js/shaders.js` are all rendering-bound. For these, the realistic options are:
 
-   **Note:** `parseMKClassification` imports `THREE.Vector3`. In a Vitest environment running Node, this requires either:
-   - Running Vitest with the default `node` environment (Three.js is generally CommonJS-safe enough for `Vector3` to construct without a WebGL context), or
-   - Configuring `environment: 'jsdom'` if any DOM is touched. For `stellarClassifier` only, plain `node` is sufficient.
-
-2. **Math helpers inside `src/js/main.js`** — `updateTelemetry` does Keplerian distance/velocity/temperature math. Currently mutates DOM (`valDistance.textContent = ...`), which couples it to the page.
-   - **Refactor first**: extract the math into a pure function in a new file `src/js/telemetry.js`:
-     ```js
-     export function computeTelemetry(distance, baseTemp) {
-       const distanceAU = distance / 800.0;
-       const speedKmS = 29.78 / Math.sqrt(distanceAU);
-       const sensorTempK = baseTemp / Math.sqrt(distanceAU * 0.8);
-       return { distanceAU, speedKmS, sensorTempK };
-     }
-     ```
-   - Then unit-test it: `computeTelemetry(800, 5800)` → `distanceAU = 1.0`, `speedKmS ≈ 29.78`, etc.
-
-### Tier 2 — Smoke / boot tests (catch wiring breakage)
-
-A single "does the app boot without throwing" test is high-value for a small WebGL portfolio piece.
-
-**Approach: jsdom + happy-dom + minimal stubs**
-
-- Run Vitest with `environment: 'jsdom'` (or `happy-dom` for speed)
-- Mock or no-op the WebGL canvas: `HTMLCanvasElement.prototype.getContext = () => fakeGL`
-- Provide `requestAnimationFrame` stub
-- Assert that `init()` runs to completion and that key globals (`scene`, `camera`, `sun`, `starfield`) are non-null after one tick
-
-**Caveat:** Three.js's `WebGLRenderer` constructor will fail without a real WebGL context. Two options:
-- **(a) Stub `WebGLRenderer`** with a fake that has `setSize`, `setPixelRatio`, `domElement`, `render` no-ops
-- **(b) Run boot tests inside a headless browser** instead (Playwright / Puppeteer) — see Tier 3
-
-### Tier 3 — End-to-end + visual regression (highest value for a renderer)
-
-A 3D renderer is mostly a *visual* contract: "the Sun should look like a sun at G2V, look red-and-bumpy at M5III, look blue-and-tight at O5I." Unit tests cannot catch shader regressions, but **screenshot-diff tests can**.
-
-**Recommended stack: Playwright + pixelmatch**
-
-**Install:**
-```bash
-npm install -D @playwright/test pixelmatch pngjs
-npx playwright install chromium
-```
-
-**Test strategy:**
-1. **`playwright.config.js`** — launch Chromium with WebGL enabled (default), fixed viewport (e.g., `1280x720`), and a deterministic render harness
-2. **Add a determinism switch to `main.js`** — when a query param like `?test=1` is present, freeze the animation clock at `t = 1.0`, disable the loader fade-out timeout, and skip auto-exposure interpolation. This is what makes screenshot diffs stable.
-3. **For each preset**, navigate to `index.html?test=1&preset=sol`, wait for `#load-progress` width to be `100%`, take a screenshot of `#canvas-container`, and compare against a committed baseline PNG in `tests/__screenshots__/sol.png`.
-
-**Example test:**
-```js
-import { test, expect } from '@playwright/test';
-
-const PRESETS = ['sol', 'redgiant', 'bluesuper', 'whitedwarf'];
-
-for (const preset of PRESETS) {
-  test(`renders ${preset} stably`, async ({ page }) => {
-    await page.goto(`http://localhost:5173/?test=1&preset=${preset}`);
-    await page.waitForFunction(() =>
-      document.getElementById('load-progress')?.style.width === '100%'
-    );
-    // Click the preset button to actually apply it
-    await page.click(`[data-preset="${preset}"]`);
-    // Allow one frame for the apply + GUI refresh
-    await page.waitForTimeout(100);
-
-    await expect(page.locator('#canvas-container canvas'))
-      .toHaveScreenshot(`${preset}.png`, { maxDiffPixelRatio: 0.02 });
-  });
-}
-```
-
-**What this catches that unit tests cannot:**
-- A typo in `surfaceFragmentShader` that produces a black sphere
-- A regression where the corona alpha goes opaque (covering the disk)
-- A wrong uniform name causing all stars to render as Sol
-- Bloom strength accidentally clamped to 0 on the post-processing path
-
-**Trade-off:** Baselines must be updated whenever the visuals legitimately change (e.g., new color palette, tweaked noise scale). Treat baseline diffs as a code-review checkpoint.
-
-### Tier 4 — Performance / frame-time tests (optional)
-
-If frame rate is a stated goal (comments suggest 60+ FPS), add a Playwright test that:
-1. Loads the page with `?test=1&preset=bluesuper` (the most expensive preset due to highest convection speed + corona density)
-2. Uses `page.evaluate` to sample `performance.now()` deltas inside the `animate` loop across ~120 frames
-3. Asserts the 95th-percentile frame time is below ~20 ms (allowing for CI hardware variance)
-
-This is fragile on CI runners without GPUs (most don't have one) — consider running this only on dedicated machines, or only locally.
-
-### Tier 5 — GLSL syntax tests (optional, low priority)
-
-Shader strings in `src/js/shaders.js` are template literals — typos compile silently in JS but error out at runtime when Three.js compiles them. A lightweight protection is a **boot test** (Tier 2) that constructs a `Sun` and `createStarfield()` against a stubbed WebGL2 context that simulates `compileShader` failure detection. Libraries like `gl` (headless-gl) can run GLSL compilation in Node, but setup is non-trivial. **Skip unless shader regressions become a recurring problem.**
-
-### What NOT to test
-
-- **`THREE.js` internals** — assume Three.js is correct; test only the integration glue
-- **`lil-gui` rendering** — same; test only that `setupGUI` runs without throwing
-- **The exact numeric uniform values produced after a slider drag** — too brittle, replace with screenshot tests
-- **CSS / DOM layout** — single-page demo, no responsive contract; spot-check manually
+- **Smoke tests via Playwright** that launch the Vite dev server, wait for the loader to fade out, and assert that the canvas pixel-count > 0 and key DOM elements (`#hud-star-class`, `#val-distance`) update when preset buttons are clicked. This catches catastrophic regressions (crashes, blank canvas, broken HUD wiring) without requiring shader output validation.
+- **Visual regression** via Playwright + pixel-diffing is possible but expensive for a procedural-noise-heavy renderer because frame output is non-deterministic. If pursued, seed `THREE.MathUtils` / `Math.random` calls and disable the time uniform.
+- **Shader compile checks** can be done by spawning a headless WebGL2 context (e.g. via `puppeteer` or `gl` npm package) and asserting `gl.getShaderParameter(shader, gl.COMPILE_STATUS) === true` for each shader exported from `src/js/shaders.js`.
 
 ### Suggested first commit
 
-The minimum sensible test suite for this project — one that catches real regressions without overengineering — is:
+**Lowest-effort, highest-payoff next step:**
 
-1. Add `vitest` as a devDep
-2. Add `"test": "vitest run"` to `package.json`
-3. Add `src/js/stellarClassifier.test.js` covering the three exported functions (~30–50 assertions, ~150 lines)
-4. (Optional follow-up) Refactor `updateTelemetry` math into a pure `src/js/telemetry.js` and test it
+1. `npm install --save-dev vitest` (Vitest is the natural pick — same Vite toolchain, ESM-first, zero config).
+2. Add `"test": "vitest"` to `package.json` scripts.
+3. Create `src/js/stellarClassifier.test.js` (or a top-level `tests/` directory if co-location is undesired) covering the cases listed under Tier 1.
 
-That alone covers >50% of the non-rendering logic in the codebase and runs in <1 second.
+Even ~30 assertions across the three pure functions in `stellarClassifier.js` would meaningfully protect the most domain-rich, least-self-documenting code in the project.
+
+## Common Patterns
+
+Not applicable — no existing tests to reference.
 
 ---
 

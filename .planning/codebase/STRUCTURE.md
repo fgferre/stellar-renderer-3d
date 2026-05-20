@@ -6,201 +6,211 @@
 
 ```
 Projeto Render 3d Sol Webgl2/
-├── index.html                  # Vite entry HTML — DOM scaffold, loads /src/js/main.js as module
-├── package.json                # ESM project ("type": "module"), Vite scripts, three + lil-gui deps
-├── package-lock.json           # Lockfile (committed)
-├── node_modules/               # npm install output (not committed; present locally)
-├── public/                     # Vite static-assets root (served at /)
-│   ├── favicon.svg             # SVG favicon (not actually wired — index.html uses inline data: URI)
-│   └── icons.svg               # SVG icon sheet (unused at runtime)
-├── src/                        # Application source
-│   ├── style.css               # Global CSS (HUD, control panel, loader, glassmorphism)
-│   ├── assets/                 # Sample/legacy bundler-managed assets (not used at runtime)
-│   │   ├── hero.png
-│   │   ├── javascript.svg
-│   │   └── vite.svg
-│   └── js/                     # All application JavaScript
-│       ├── main.js             # Orchestrator: scene/camera/renderer/composer/animate()/GUI/HUD
-│       ├── sun.js              # `Sun` class — core/prominence/corona/lens-flare composite
-│       ├── shaders.js          # GLSL vertex/fragment shader sources (template-string exports)
-│       ├── starfield.js        # `createStarfield()` factory → THREE.Points twinkling stars
-│       └── stellarClassifier.js # `parseMKClassification`, `lookupHYGStar`, `kelvinToColorGrading`
-└── dist/                       # Vite build output (committed for static hosting)
-    ├── index.html              # Minified HTML referencing hashed assets
-    └── assets/
-        ├── index-Cc6hYQRo.js   # Bundled JS (hash will change between builds)
-        └── index-BZJ_aShM.css  # Bundled CSS
+├── .git/                          # Git repository data
+├── .gitignore                     # node_modules, dist, logs, editor cruft
+├── .planning/                     # GSD planning artifacts (this map lives here)
+│   └── codebase/                  # ARCHITECTURE.md, STRUCTURE.md, etc.
+├── dist/                          # Vite production build output (gitignored)
+│   ├── assets/
+│   │   ├── index-BLmR4hoz.css     # Bundled & minified style.css
+│   │   └── index-DjpY_CxB.js      # Bundled & minified JS (three + lil-gui + app)
+│   ├── favicon.svg                # Copied from public/
+│   ├── icons.svg                  # Copied from public/
+│   └── index.html                 # Rewritten entry with asset hashes
+├── index.html                     # HTML entry point (canvas, HUD, control panel, loader)
+├── node_modules/                  # npm dependencies (gitignored)
+├── package.json                   # name, scripts (dev/build/preview), three + lil-gui deps
+├── package-lock.json              # npm lockfile
+├── public/                        # Vite static assets (copied verbatim to dist/)
+│   ├── favicon.svg                # Browser tab icon
+│   └── icons.svg                  # SVG sprite (not currently referenced from code)
+└── src/
+    ├── assets/                    # Bundleable assets (currently unreferenced Vite scaffold leftovers)
+    │   ├── hero.png
+    │   ├── javascript.svg
+    │   └── vite.svg
+    ├── js/                        # Application source code
+    │   ├── main.js                # Orchestrator + render loop + HUD bindings (1,228 lines)
+    │   ├── sun.js                 # Sun class — 3 meshes + lens flares + 5 preset slots (530 lines)
+    │   ├── shaders.js             # GLSL helpers + 4 shader programs (544 lines)
+    │   ├── starfield.js           # 6000-point procedural starfield factory (79 lines)
+    │   └── stellarClassifier.js   # MK parser + Kelvin→RGB + HYG catalog (404 lines)
+    └── style.css                  # Glassmorphism HUD, 3D labels, loader styles (615 lines)
 ```
 
 ## Directory Purposes
 
-**Project root:**
-- Purpose: Vite's default project root. `index.html` is the entry point Vite uses for both `dev` and `build`.
-- Contains: HTML entry, package manifest, lockfile, and the four working folders (`src/`, `public/`, `dist/`, `node_modules/`).
-- Key files: `index.html`, `package.json`.
-
-**`public/`:**
-- Purpose: Vite's static-assets directory. Files here are copied verbatim into the build output at the root URL (`/`).
-- Contains: SVG assets (`favicon.svg`, `icons.svg`).
-- Note: Despite the project description mentioning shaders/textures in `public/`, this folder currently holds only two SVG files. No GLSL files, no PNG textures, no HDR maps. All shaders live in `src/js/shaders.js` and all textures are procedural (canvas-rendered in `src/js/sun.js`).
+**`./` (project root):**
+- Purpose: Vite project root. Vite treats `index.html` here as the implicit entry.
+- Contains: `package.json`, `index.html`, `.gitignore`, `package-lock.json`.
+- Key files: `index.html` (HTML scaffold + HUD markup + loader), `package.json` (deps + scripts).
 
 **`src/`:**
-- Purpose: Application source root.
-- Contains: One stylesheet, one nested `js/` folder, and a `assets/` folder of Vite-scaffold leftovers.
-- Key files: `src/style.css` (536 lines), everything under `src/js/`.
+- Purpose: All hand-written source code (JS + CSS).
+- Contains: `style.css` (top-level stylesheet) and the `js/` subdirectory.
+- Key files: `src/style.css` (615 lines, imported by `src/js/main.js:9` as `import '../style.css'`).
 
 **`src/js/`:**
-- Purpose: All application JavaScript modules (ESM).
-- Contains: Five files — one orchestrator (`main.js`), one composite class (`sun.js`), one factory (`starfield.js`), one helper module (`stellarClassifier.js`), one shader-source module (`shaders.js`).
-- Key files: `src/js/main.js` is the script-tag entry; everything else is imported from it.
+- Purpose: All JavaScript modules. Flat — no further nesting.
+- Contains: 5 ES-module files.
+- Key files:
+  - `src/js/main.js` — single entry, orchestrator.
+  - `src/js/sun.js` — `Sun` class (NEW file extracted from `main.js` in this revision).
+  - `src/js/shaders.js` — GLSL programs as exported template-literal strings.
+  - `src/js/starfield.js` — `createStarfield(numStars)` factory.
+  - `src/js/stellarClassifier.js` — `parseMKClassification`, `lookupHYGStar`, `kelvinToColorGrading`, `HYG_DATABASE`.
 
 **`src/assets/`:**
-- Purpose: Vite default-template scaffold assets. Not imported by any runtime code.
-- Contains: `hero.png`, `javascript.svg`, `vite.svg`.
+- Purpose: Bundleable static assets resolved via `import` (Vite copies + hashes them).
+- Contains: `hero.png`, `javascript.svg`, `vite.svg` — currently *unreferenced* by any source file. Likely leftover from the initial `npm create vite` scaffold.
 - Generated: No.
 - Committed: Yes.
-- Note: Safe to delete — nothing in `src/js/` references these files.
+
+**`public/`:**
+- Purpose: Vite static assets served at the site root verbatim (no hashing, no transform).
+- Contains: `favicon.svg`, `icons.svg`.
+- Generated: No.
+- Committed: Yes.
 
 **`dist/`:**
-- Purpose: Vite build output (`npm run build`).
-- Contains: Minified `index.html` plus hashed JS/CSS in `dist/assets/`.
-- Generated: Yes (`vite build`).
-- Committed: Yes (currently checked in; check `.gitignore` policy before regenerating).
+- Purpose: Vite production build output (`vite build`).
+- Contains: Hashed bundles, copied `public/` assets, rewritten `index.html`.
+- Generated: Yes (by `npm run build`).
+- Committed: No (in `.gitignore` line 11).
+
+**`.planning/codebase/`:**
+- Purpose: GSD codebase-map artifacts. This directory holds the docs you are reading.
+- Contains: `ARCHITECTURE.md`, `STRUCTURE.md`, (and potentially `STACK.md`, `INTEGRATIONS.md`, `CONVENTIONS.md`, `TESTING.md`, `CONCERNS.md` when other map agents run).
+- Generated: Yes (by `/gsd:map-codebase`).
+- Committed: Yes.
 
 **`node_modules/`:**
-- Purpose: npm dependency cache.
-- Generated: Yes (`npm install`).
-- Committed: No (standard).
+- Purpose: npm-installed dependency tree.
+- Generated: Yes (by `npm install`).
+- Committed: No (`.gitignore`).
 
 ## Key File Locations
 
 **Entry Points:**
-- `index.html`: HTML entry (Vite root). Loads stylesheet via JS import (line 110 of `index.html` plus `import '../style.css'` at `src/js/main.js:9`).
-- `src/js/main.js`: JS entry. `window.onload = init` at `src/js/main.js:424`.
+- `index.html`: HTML scaffold; mounts `<div id="canvas-container">`, `#space-hud`, `#control-panel`, `#comparison-labels-container`, `#loader`; loads `/src/js/main.js` as a module on line 154.
+- `src/js/main.js:1228`: `window.onload = init;` — the single JS entry.
 
 **Configuration:**
-- `package.json`: Dependencies, scripts (`dev`, `build`, `preview`), `"type": "module"`.
-- No `vite.config.*`, no `tsconfig.json`, no `.eslintrc`, no `.prettierrc`, no `.nvmrc`. Vite uses default conventions.
+- `package.json`: scripts (`dev`/`build`/`preview`), dependencies (`three`, `lil-gui`), devDependency (`vite`).
+- `.gitignore`: standard Node + Vite ignores.
+- No `vite.config.*`, no `tsconfig.json`, no `.eslintrc.*`, no `.prettierrc`, no `.nvmrc`, no `.env*` files present.
 
 **Core Logic:**
-- `src/js/main.js`: Scene setup (`init`, `src/js/main.js:37-109`), render loop (`animate`, `src/js/main.js:369-410`), GUI mounting (`setupGUI`, `src/js/main.js:119-178`), HUD event bindings (`setupHUDBindings`, `src/js/main.js:181-306`), auto-exposure/telemetry helpers.
-- `src/js/sun.js`: `Sun` class with `initCore`, `initProminences`, `initCorona`, `initLensFlares`, `updateLensFlares`, `update`, `setPreset`. Procedural canvas-texture helpers (`createGlowTexture`, `createRingTexture`, `createHexagonTexture`) at module top.
-- `src/js/shaders.js`: GLSL shaders exported as template strings — `surfaceVertexShader` / `surfaceFragmentShader` / `prominenceVertexShader` / `prominenceFragmentShader` / `coronaVertexShader` / `coronaFragmentShader` / `starfieldVertexShader` / `starfieldFragmentShader`, plus shared helpers `simplexNoiseGLSL` / `blackbodyGLSL` / `valueNoiseGLSL`.
-- `src/js/starfield.js`: One exported function `createStarfield(numStars = 8000)`.
-- `src/js/stellarClassifier.js`: `parseMKClassification`, `lookupHYGStar`, `kelvinToColorGrading`, plus the `HYG_DATABASE` lookup constant (15 named stars).
-
-**Styling:**
-- `src/style.css`: All visual styling — glassmorphism panels, HUD layout, preset button skins, control panel collapse animation, loader screen.
+- `src/js/main.js`: render loop (`animate`, lines 1081-1214), `init` (60-153), mode lifecycle (`enterComparisonMode` 287-394, `exitComparisonMode` 396-457, `startCinematicFlyby` 638-656, `stopCinematicFlyby` 658-673), cinematic camera (`updateCinematicCamera` 675-759), HUD bindings (`setupHUDBindings` 762-967), GUI mount (`setupGUI` 174-284), auto-exposure (`updateAutoExposure` 1006-1042), telemetry (`updateTelemetry` 1045-1063, `updatePhysicalHUD` 1066-1078), label projection (`updateHTML3DLabels` 588-635).
+- `src/js/sun.js`: `Sun` class (lines 95-530) with `constructor` (143-166), `initCore` (169-191), `initProminences` (194-218), `initCorona` (221-242), `initLensFlares` (245-250), `updateLensFlares` (252-307), `update` (310-348), `getPresetDefaultSettings` (351-456), `applyCurrentParams` (459-494), `resetCurrentPresetToDefault` (497-501), `setPreset` (504-529). Module-private texture helpers at lines 13-93.
+- `src/js/shaders.js`: `simplexNoiseGLSL` (4-76), `blackbodyGLSL` (80-132), `valueNoiseGLSL` (135-179), `surfaceVertexShader`/`surfaceFragmentShader` (182-306), `prominenceVertexShader`/`prominenceFragmentShader` (309-412), `coronaVertexShader`/`coronaFragmentShader` (415-495), `starfieldVertexShader`/`starfieldFragmentShader` (498-544).
+- `src/js/starfield.js`: `createStarfield(numStars)` (9-79).
+- `src/js/stellarClassifier.js`: `kelvinToColorGrading` (4-41), `parseMKClassification` (47-327), `HYG_DATABASE` (329-348), `lookupHYGStar` (350-404).
 
 **Testing:**
-- Not present. No test framework, no `*.test.*` or `*.spec.*` files, no `__tests__` directory.
+- None. No `tests/`, no `__tests__/`, no `*.test.*` or `*.spec.*` files. No test runner in `package.json`.
 
-**Build artifacts:**
-- `dist/index.html`, `dist/assets/index-*.js`, `dist/assets/index-*.css`.
+**Build Output:**
+- `dist/index.html`, `dist/assets/index-*.js`, `dist/assets/index-*.css`, plus copies of `public/` files.
 
 ## Naming Conventions
 
 **Files:**
-- Pattern: `camelCase.js` for multi-word module names (`stellarClassifier.js`). Single-word modules use lowercase (`main.js`, `sun.js`, `shaders.js`, `starfield.js`).
-- HTML/CSS entry files use lowercase (`index.html`, `style.css`).
+- JavaScript modules: `camelCase.js` — `main.js`, `sun.js`, `shaders.js`, `starfield.js`, `stellarClassifier.js`.
+- Stylesheet: `style.css` (lowercase, no prefix).
+- HTML: `index.html` (lowercase).
+- Class-bearing modules use the singular noun (`sun.js` exports `Sun`).
+- Factory-bearing modules use the noun matching the produced object (`starfield.js` exports `createStarfield` returning a `THREE.Points`).
+- No `index.js` barrel files anywhere.
 
 **Directories:**
-- Pattern: Lowercase, single-word where possible (`src`, `public`, `dist`, `js`, `assets`).
+- All lowercase (`src`, `js`, `assets`, `public`, `dist`).
+- No `components/`, `services/`, `utils/`, `lib/` — flat directory style.
 
 **JavaScript identifiers:**
-- Classes: `PascalCase` (`Sun`).
-- Functions: `camelCase` (`createStarfield`, `parseMKClassification`, `lookupHYGStar`, `kelvinToColorGrading`, `setupGUI`, `setupHUDBindings`, `updateAutoExposure`, `updateTelemetry`, `updateLensFlares`, `applyCustomClass`).
-- Variables: `camelCase` (`scene`, `camera`, `renderer`, `composer`, `bloomPass`, `clock`, `timeSpeed`, `flightTargetPos`, `lastTelemetryUpdateTime`).
-- Module-level constants: `UPPER_SNAKE` for tables (`HYG_DATABASE` at `src/js/stellarClassifier.js:193`) but `camelCase` for shader-string exports (`simplexNoiseGLSL`, `valueNoiseGLSL`, etc.).
-- Boolean flags: descriptive `is`/`use` prefixes (`isFlying`, `usePostProcessing`).
+- Classes: `PascalCase` — `Sun` (`src/js/sun.js:95`).
+- Functions: `camelCase` — `createStarfield`, `parseMKClassification`, `lookupHYGStar`, `kelvinToColorGrading`, `updateComparisonLayout`, `setupHUDBindings`, `setupGUI`, `enterComparisonMode`, `focusOnComparisonStar`.
+- Module-scope state: `camelCase` — `isFlying`, `flightTargetPos`, `comparisonScaleMode`, `activeFocusedStar`, `cinematicTime`.
+- Module-scope constants: `UPPER_SNAKE_CASE` — `HYG_DATABASE` (`src/js/stellarClassifier.js:329`).
+- DOM-element references: `camelCase` matching the kebab-case HTML ID — `valDistance` ↔ `#val-distance`, `valVelocity` ↔ `#val-velocity`, `hudStarClass` ↔ `#hud-star-class`, `loadProgressBar` ↔ `#load-progress`, `loaderScreen` ↔ `#loader`.
 
-**GLSL uniforms (Sun materials):**
-- All shader uniforms are `u`-prefixed: `uTime`, `uHighTemp`, `uLowTemp`, `uNoiseScale`, `uConvectionSpeed`, `uSunspotThreshold`, `uPlageIntensity`, `uColorGrading`, `uProminenceHeight`, `uProminenceSpeed`, `uBaseTemp`, `uEdgeFade`, `uScale`, `uTemp`, `uCoronaSpeed`, `uCoronaDensity` (`src/js/sun.js:134-191`, declared at the top of every shader in `src/js/shaders.js`).
+**GLSL uniforms:**
+- All uniforms are `uPascalCase` — `uTime`, `uHighTemp`, `uLowTemp`, `uNoiseScale`, `uConvectionSpeed`, `uSunspotThreshold`, `uPlageIntensity`, `uColorGrading`, `uLimbExponent`, `uLimbBase`, `uPlageGrading`, `uProminenceSpeed`, `uProminenceHeight`, `uBaseTemp`, `uEdgeFade`, `uPolarJetIntensity`, `uScale`, `uTemp`, `uCoronaSpeed`, `uCoronaDensity`.
+- Vertex shader varyings are `vCamelCase` — `vPosition`, `vNormal`, `vViewDir`, `vLocalPosition`, `vDisplacement`, `vPolarFactor`, `vUv`, `vColor`, `vPhase`.
+- Vertex attributes are `aCamelCase` — `aSize`, `aColor`, `aPhase` (used by `starfield`).
 
-**GLSL varyings:**
-- All varyings are `v`-prefixed: `vPosition`, `vNormal`, `vViewDir`, `vLocalPosition`, `vDisplacement`, `vUv`, `vColor`, `vPhase` (`src/js/shaders.js`).
-
-**GLSL attributes (starfield only):**
-- Custom attributes are `a`-prefixed: `aSize`, `aColor`, `aPhase` (`src/js/shaders.js:475-477`, `src/js/starfield.js:63-65`).
-
-**DOM ids:**
-- Kebab-case: `canvas-container`, `space-hud`, `control-panel`, `toggle-panel`, `gui-container`, `load-progress`, `val-distance`, `val-velocity`, `val-temperature`, `hud-star-class`, `input-custom-class`, `btn-apply-custom-class`, `btn-preset-sol` / `btn-preset-red` / etc., `btn-nav-far` / etc.
-
-**DOM classes:**
-- Kebab-case for general styling (`glass-panel`, `reading-box`, `reading-title`, `reading-value`, `preset-btn`, `nav-btn`, `panel-header`, `panel-footer`, `loader-content`).
-- Stellar-type modifiers: `yellow-dwarf`, `red-giant`, `blue-super`, `white-dwarf` (applied/removed by `src/js/main.js:200-213` and `:285-295`).
-
-**`data-` attributes:**
-- `data-preset` (`sol` | `redgiant` | `bluesuper` | `whitedwarf`) on preset buttons.
-- `data-distance` (`far` | `orbit` | `close`) on autopilot buttons.
+**CSS:**
+- IDs: kebab-case scoped to their semantic role — `#canvas-container`, `#space-hud`, `#control-panel`, `#gui-container`, `#comparison-labels-container`, `#comparison-focus-grid`, `#comparison-focus-panel`, `#comparison-scale-toggle-container`, `#btn-cinematic-flyby`, `#btn-comparison-mode`, `#btn-preset-sol`, `#btn-preset-red`, `#btn-preset-blue`, `#btn-preset-white`, `#btn-apply-custom-class`, `#input-custom-class`, `#btn-scale-visual`, `#btn-scale-real`, `#btn-nav-far`, `#btn-nav-orbit`, `#btn-nav-close`, `#hud-star-class`, `#val-distance`, `#val-velocity`, `#val-temperature`, `#val-mass`, `#val-radius`, `#val-luminosity`, `#val-rotation-velocity`, `#loader`, `#load-progress`, `#toggle-panel`.
+- Classes: kebab-case — `.glass-panel`, `.hud-header`, `.hud-label`, `.hud-status-indicator`, `.pulse-dot`, `.hud-readings`, `.reading-box`, `.reading-title`, `.reading-value`, `.hud-section-title`, `.preset-buttons`, `.preset-btn`, `.class-code`, `.class-name`, `.autopilot-buttons`, `.nav-btn`, `.panel-header`, `.panel-footer`, `.loader-content`, `.solar-eclipse-loader`, `.loader-corona`, `.loader-core`, `.loader-text`, `.loader-progress`, `.progress-bar`, `.star-label-3d`, `.label-card`, `.label-glow-line`, `.label-name`, `.label-details`, `.focus-star-btn`.
+- Modifier classes: appended with semantic word, no dash-separator BEM (e.g. `.preset-btn.active`, `.nav-btn.warning`, `.reading-value.yellow-dwarf`, `.star-label-3d.visible`, `.star-label-3d.active-focus`).
+- Data attributes for behavior: `data-preset` (sol/redgiant/bluesuper/whitedwarf) and `data-distance` (far/orbit/close).
 
 ## Where to Add New Code
 
-**New stellar feature (additional mesh layer):**
-- Implementation: Add `init<Feature>()` method to `Sun` in `src/js/sun.js`, store the new mesh on `this.<feature>Mesh` and the material on `this.<feature>Material`, push the mesh onto `this.group`.
-- Shaders: Add `<feature>VertexShader` and `<feature>FragmentShader` exports to `src/js/shaders.js`; import them at the top of `sun.js`.
-- Per-frame updates: Add a `this.<feature>Material.uniforms.uTime.value = time` line inside `Sun.update()`.
-- Preset overrides: Extend the four preset blocks inside `Sun.setPreset()` (`src/js/sun.js:284-364`) with the new fields and add corresponding uniform writes in the assignment block at `src/js/sun.js:380-398`.
-- GUI controls: Add a new folder block inside `setupGUI()` (`src/js/main.js:119-178`) with `.onChange` callbacks that mirror the existing pattern.
+**New stellar preset (e.g. "neutron star"):**
+- Add a `case 'neutronstar':` block to `Sun.getPresetDefaultSettings` (`src/js/sun.js:351-456`).
+- Add a `neutronstar:` key to the `presetStates` initializer in the `Sun` constructor (`src/js/sun.js:148-154`).
+- Add the HUD button in `index.html` (`.preset-buttons` block, after the existing 4) with `data-preset="neutronstar"`.
+- Add an active-state CSS rule in `src/style.css` (mirror the pattern at lines 180-183) and a `.reading-value.neutron-star` color class (mirror line 132).
+- Update the `setupHUDBindings()` preset-button switch in `src/js/main.js:790-803` to set the HUD class code.
 
-**New GUI slider for an existing parameter:**
-- Add the field to `Sun.params` (default value) inside the `Sun` constructor (`src/js/sun.js:101-120`).
-- Wire it to the appropriate `ShaderMaterial.uniforms` entry inside the matching `init<Section>()` method.
-- Add a `gui.add(sun.params, '<field>', min, max, step).onChange(() => sun.<material>.uniforms.u<Field>.value = sun.params.<field>)` line in `setupGUI()` (`src/js/main.js:119-169`).
-- Add a default in every preset block of `Sun.setPreset()` and a uniform-write line in the assignment block.
+**New cinematic flyby shot:**
+- Extend the timeline in `updateCinematicCamera()` (`src/js/main.js:675-759`) with a new `else if (cinematicTime < N)` branch.
+- Update the final `else { stopCinematicFlyby(); }` cutoff to the new total duration.
+- If per-star choreography is needed, mirror the in-`animate()` block at `src/js/main.js:1146-1184`.
 
-**New HUD button (preset or autopilot):**
-- Add a `<button>` to `#space-hud` in `index.html`, with `data-preset="<name>"` or `data-distance="<name>"` and the same class pattern (`preset-btn` or `nav-btn`).
-- Extend the corresponding `switch` (presets via `Sun.setPreset()` in `src/js/sun.js:284-364`; autopilot targets via the `if (distType === ...)` block in `src/js/main.js:228-236`).
-- Update the HUD-class branching in `setupHUDBindings()` (`src/js/main.js:200-213`).
+**New shader (or shader variant):**
+- Append the GLSL program as an `export const xxxVertexShader = \`...\`` / `xxxFragmentShader` to `src/js/shaders.js`.
+- Reuse helpers via `${simplexNoiseGLSL}` / `${valueNoiseGLSL}` / `${blackbodyGLSL}` interpolation.
+- Import + use in `src/js/sun.js` (or a new file) by constructing a `new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms })`.
 
-**New named star in HYG database:**
-- Add an entry to `HYG_DATABASE` in `src/js/stellarClassifier.js:193-210` with shape `{ name, spect, temp, lum }`. The key is the uppercased query (strip non-alphanumeric). Real radius is derived from `temp` + `lum` by Stefan-Boltzmann.
+**New star in the comparison lineup:**
+- Add an entry to the `lineupData` array in `enterComparisonMode()` (`src/js/main.js:318-332`).
+- If the query is not yet in the HYG catalog, add it to `HYG_DATABASE` (`src/js/stellarClassifier.js:329-348`).
+- If indexed by position in the cinematic Take 2 (`src/js/main.js:1156, 1166, 1176`), update those hard-coded indices.
 
-**New shader helper (e.g., curl noise, fractal noise variants):**
-- Add a `export const <name>GLSL = \`...\`;` block in `src/js/shaders.js` near the existing helpers (top of file).
-- Inject into consumer shaders via `${<name>GLSL}` template interpolation, following the pattern at `src/js/shaders.js:214`.
+**New HUD telemetry field:**
+- Add `<div class="reading-box">` markup to `index.html` inside `.hud-readings` (lines 28-61).
+- Add a module-scope `getElementById` reference at the top of `src/js/main.js:48-57`.
+- Update `updatePhysicalHUD()` (`src/js/main.js:1066-1078`) or `updateTelemetry()` (`src/js/main.js:1045-1063`) to write the new value.
 
-**New post-processing pass:**
-- Add the pass between `bloomPass` and `outputPass` inside `init()` at `src/js/main.js:86-89`. Update `onWindowResize()` if the pass has a `setSize` requirement (`src/js/main.js:412-421`).
+**New GUI control:**
+- Add a `fFolder.add(sun.params, 'newParam', min, max, step).name('Label').onChange(onGUIParameterChange);` call inside `setupGUI()` (`src/js/main.js:174-284`).
+- Ensure the corresponding shader uniform is registered in `Sun.initCore`/`initProminences`/`initCorona` (`src/js/sun.js:169-242`) and read in `applyCurrentParams()` (`src/js/sun.js:459-494`).
 
-**New telemetry readout:**
-- Add a `.reading-box` to `#space-hud` in `index.html` (mirror the `#hud-distance` block).
-- Cache the DOM ref alongside `valDistance` / `valVelocity` / `valTemperature` at the top of `src/js/main.js:29-34`.
-- Update it inside `updateTelemetry()` (`src/js/main.js:351-366`).
-
-**Style changes:**
-- Edit `src/style.css` (single 536-line file; no CSS modules, no SCSS, no Tailwind).
-
-**Static assets:**
-- Drop the file into `public/` for verbatim copy-through, or into `src/assets/` if you want Vite to fingerprint and bundle it (then import via `import url from '../assets/foo.png'`).
+**New utility/helper that doesn't fit elsewhere:**
+- Create a new file in `src/js/` (flat, no nested subdirectories).
+- Export named functions (no default exports — none used in this codebase).
+- Import via relative path `./newFile.js` from `main.js` or another sibling.
 
 ## Special Directories
 
 **`public/`:**
-- Purpose: Vite static-assets directory; contents are served at site root in dev and copied to `dist/` root in build.
+- Purpose: Vite static assets served at site root, copied verbatim to `dist/` on build.
 - Generated: No.
 - Committed: Yes.
-
-**`dist/`:**
-- Purpose: Production build output (`vite build`).
-- Generated: Yes.
-- Committed: Yes (currently checked in).
+- Currently holds `favicon.svg` and `icons.svg`. `favicon.svg` is referenced by the inline SVG `<link rel="icon">` at `index.html:5` (which embeds a different emoji-based icon, not the file in `public/`); `icons.svg` is not referenced anywhere in source.
 
 **`src/assets/`:**
-- Purpose: Originally the Vite template's bundled-assets folder. Contains `hero.png`, `javascript.svg`, `vite.svg` — none are imported anywhere in `src/js/`.
+- Purpose: Vite-pipelined assets (typically imported as URLs from JS — `import heroPng from './assets/hero.png'`).
 - Generated: No.
 - Committed: Yes.
+- Currently contains `hero.png`, `javascript.svg`, `vite.svg` — none of which are imported by any JS file. These are leftover Vite scaffold artifacts and can be deleted without affecting the build.
+
+**`dist/`:**
+- Purpose: Production build output.
+- Generated: Yes (`npm run build` / `vite build`).
+- Committed: No (`.gitignore`).
 
 **`node_modules/`:**
-- Purpose: npm install cache.
-- Generated: Yes.
-- Committed: No.
+- Purpose: npm dependency tree.
+- Generated: Yes (`npm install`).
+- Committed: No (`.gitignore`).
 
-**`.planning/codebase/`:**
-- Purpose: GSD codebase-map output (this document and ARCHITECTURE.md live here).
-- Generated: Yes (by `/gsd:map-codebase`).
-- Committed: Project convention determines.
+**`.planning/`:**
+- Purpose: GSD planning workflow artifacts (codebase maps, phase plans, etc.).
+- Generated: Yes (by the GSD command suite).
+- Committed: Yes.
 
 ---
 
