@@ -12,6 +12,20 @@ import { createStarfield } from './starfield.js';
 import { parseMKClassification, lookupHYGStar, kelvinToColorGrading } from './stellarClassifier.js';
 
 // Application State Variables
+// Physical / scene-scale constants. These tie the abstract scene-unit space
+// (where 1 sun radius = 100 units) to physical units for the HUD readouts.
+// SCENE_UNITS_PER_AU is independent of the sun-radius convention and was
+// chosen visually; it's the calibration knob between camera distance and
+// the "X.XXX AU" telemetry display.
+const SCENE_UNITS_PER_AU = 800.0;
+// Earth's circular orbital velocity at 1 AU around 1 M☉. Used as the reference
+// for the Kepler-Newton orbital speed formula v = 29.78 * sqrt(M / r).
+const EARTH_ORBITAL_VELOCITY_KMS = 29.78;
+// Equilibrium temperature constant: planet/probe temperature at 1 AU from a
+// 1 L☉ star, assuming Earth-like albedo ~0.3. Used for the sensor temperature
+// readout: T = K * L^0.25 / sqrt(d_AU).
+const EARTH_EQUILIBRIUM_TEMP_K = 278.0;
+
 let scene, camera, renderer, controls, gui;
 let sun, starfield;
 let composer, bloomPass;
@@ -1064,20 +1078,31 @@ function updateTelemetry(distance, delta) {
   const star = (isComparisonMode && activeFocusedStar) ? activeFocusedStar : sun;
   if (!star || !star.params) return;
 
-  // Convert units to represent astronomical values (scale: 800 units = 1 Astronomical Unit / AU)
-  const distanceAU = distance / 800.0;
+  // Distance in astronomical units. Note: in visual-scale comparison mode the
+  // scene-unit-to-AU mapping is no longer physical (stars are spaced for
+  // didactic clarity, not to scale), so the AU readout is a visual analog
+  // rather than a real measurement.
+  const distanceAU = Math.max(1e-6, distance / SCENE_UNITS_PER_AU);
   valDistance.textContent = `${distanceAU.toFixed(3)} AU`;
 
-  // Orbit speed: speed goes up when orbiting closer (Keplerian physics simulation)
-  const baseSpeedVal = 29.78; // Earth orbit speed in km/s
-  const currentSpeed = baseSpeedVal / Math.sqrt(distanceAU);
+  // Kepler-Newton circular orbital velocity: v = sqrt(G*M / r).
+  // Normalized to Earth: 29.78 km/s at 1 AU around 1 M☉.
+  // Mass matters — a hypothetical probe orbiting a 25 M☉ star at 1 AU would
+  // be moving at 29.78 * sqrt(25) ~= 149 km/s, not 29.78 km/s.
+  const starMass = star.params.mass !== undefined ? star.params.mass : 1.0;
+  const currentSpeed = EARTH_ORBITAL_VELOCITY_KMS * Math.sqrt(starMass / distanceAU);
   valVelocity.textContent = `${currentSpeed.toFixed(2)} km/s`;
 
-  // sensor temperature reading based on distance
-  // gets hotter when closer due to blackbody flux density
-  const baseTemp = star.params.highTemp;
-  const radiationFluxTemp = baseTemp / Math.sqrt(distanceAU * 0.8);
-  valTemperature.textContent = `${Math.floor(radiationFluxTemp).toLocaleString()} K`;
+  // Sensor equilibrium temperature for a probe at distance d from a star
+  // with luminosity L (in L☉). Stefan-Boltzmann + radiative balance:
+  // T = T_earth * L^0.25 / sqrt(d_AU), where T_earth = 278 K bakes in
+  // Earth-like albedo (~0.3) and unit emissivity. At very small d this
+  // approximation breaks down (you'd be inside the star) — clamping AU
+  // above prevents division by zero but the number isn't physically
+  // meaningful below ~stellar radius.
+  const starLum = star.params.lum !== undefined ? star.params.lum : 1.0;
+  const sensorTemp = EARTH_EQUILIBRIUM_TEMP_K * Math.pow(starLum, 0.25) / Math.sqrt(distanceAU);
+  valTemperature.textContent = `${Math.floor(sensorTemp).toLocaleString()} K`;
 }
 
 // Update static physical properties in telemetry HUD panel
