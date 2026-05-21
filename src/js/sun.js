@@ -252,9 +252,14 @@ export class Sun {
   }
 
   updateLensFlares() {
-    // Clear existing flare elements
+    // Clear existing flare elements. Lensflare owns an internal material and
+    // render target — dispose them before unparenting or each rebuild leaks
+    // GPU resources. The CanvasTextures used by addElement are tracked
+    // separately on this.currentGlow/Ring/Hex and disposed below.
     while (this.flareGroup.children.length > 0) {
-      this.flareGroup.remove(this.flareGroup.children[0]);
+      const child = this.flareGroup.children[0];
+      if (typeof child.dispose === 'function') child.dispose();
+      this.flareGroup.remove(child);
     }
 
     // Dispose of previously generated textures to prevent GPU memory leaks
