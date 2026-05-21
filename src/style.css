@@ -18,7 +18,7 @@ html, body {
 }
 
 #canvas-container {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
@@ -28,10 +28,16 @@ html, body {
 
 /* Space Flight Cockpit HUD */
 #space-hud {
-  position: absolute;
+  position: fixed;
   top: 20px;
   left: 20px;
   width: 380px;
+  /* Cap to viewport height so the panel never overflows offscreen on short
+     desktop windows; internal scroll handles long content. Without this,
+     clicking a button below the fold could trigger browser scroll-into-view
+     and shift the entire fixed-looking layout. */
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   z-index: 10;
   padding: 20px;
   background: rgba(8, 8, 16, 0.55);
@@ -250,11 +256,12 @@ html, body {
 
 /* Parameter Configuration Control Panel */
 #control-panel {
-  position: absolute;
+  position: fixed;
   top: 20px;
   right: 20px;
   width: 340px;
   max-height: calc(100vh - 40px);
+  overflow-y: auto;
   z-index: 10;
   padding: 16px;
   background: rgba(8, 8, 16, 0.55);
@@ -542,7 +549,7 @@ html, body {
 
 /* HTML 3D Labels Overlay Container */
 #comparison-labels-container {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
