@@ -1069,7 +1069,14 @@ function setupHUDBindings() {
 function updateGUIDisplay() {
   const star = (isComparisonMode && activeFocusedStar) ? activeFocusedStar : sun;
   if (sun && star && sun !== star) {
+    // Mirror the focused star's params into sun.params so the GUI rendering
+    // (which binds to sun.params) reflects whichever star is in focus. Preserve
+    // lensFlaresEnabled — see focusOnComparisonStar for why this is global, not
+    // per-star. Without this guard, refocusing silently re-enables flares the
+    // user just turned off.
+    const preservedFlareEnabled = sun.params.lensFlaresEnabled;
     sun.copyParams(star.params, sun.params);
+    sun.params.lensFlaresEnabled = preservedFlareEnabled;
   }
 
   if (guiColorProxies && sun && sun.params) {
