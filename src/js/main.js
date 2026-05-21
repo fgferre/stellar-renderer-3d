@@ -246,7 +246,6 @@ function setupGUI() {
     onGUIParameterChange();
     updateGUIDisplay();
   });
-  fSurface.add(sun.params, 'lowTemp', 800, 20000, 100).name('Min Temp (K)').onChange(onGUIParameterChange);
   fSurface.add(sun.params, 'convectionSpeed', 0.0, 1.0, 0.01).name('Convection Speed').onChange(onGUIParameterChange);
   fSurface.add(sun.params, 'sunspotThreshold', 0.1, 0.9, 0.01).name('Sunspot Coverage').onChange(onGUIParameterChange);
   fSurface.add(sun.params, 'plageIntensity', 0.0, 2.0, 0.05).name('Plage Intensity').onChange(onGUIParameterChange);
