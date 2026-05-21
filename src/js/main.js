@@ -1438,9 +1438,16 @@ function onWindowResize() {
   // DPI) mutate window.devicePixelRatio at runtime, but renderer caches the
   // value from its last setPixelRatio call. Without this, moving the window
   // to a Retina display leaves the canvas at the original integer scale.
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // Composer keeps its own pixel ratio for the postprocessing render targets;
+  // without composer.setPixelRatio the bloom path stays at stale DPR even
+  // after the renderer updates.
+  const pixelRatio = Math.min(window.devicePixelRatio, 2);
+  renderer.setPixelRatio(pixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
+  if (composer) {
+    composer.setPixelRatio(pixelRatio);
+    composer.setSize(window.innerWidth, window.innerHeight);
+  }
   if (bloomPass) {
     bloomPass.setSize(window.innerWidth / 2, window.innerHeight / 2);
   }
