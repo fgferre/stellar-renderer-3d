@@ -881,6 +881,8 @@ function startCinematicFlyby() {
     flyBtn.style.borderColor = 'rgba(255, 56, 56, 0.4)';
     flyBtn.style.background = 'rgba(255, 56, 56, 0.08)';
     flyBtn.style.color = '#ff3838';
+    flyBtn.classList.add('active');
+    syncAriaPressed();
   }
 }
 
@@ -895,6 +897,8 @@ function stopCinematicFlyby() {
     flyBtn.style.borderColor = 'rgba(0, 191, 255, 0.4)';
     flyBtn.style.background = 'rgba(0, 191, 255, 0.08)';
     flyBtn.style.color = '#00bfff';
+    flyBtn.classList.remove('active');
+    syncAriaPressed();
   }
 
   // Restore camera target to Sol
