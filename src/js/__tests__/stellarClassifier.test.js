@@ -205,10 +205,13 @@ describe('lookupHYGStar', () => {
     expect(lookupHYGStar('')).toBeNull();
   });
 
-  it('synchronizes catalog temp to highTemp / lowTemp / colorGrading', () => {
+  it('synchronizes catalog temp to highTemp / lowTemp / colorGrading / prominenceBaseTemp', () => {
     const sirius = lookupHYGStar('SIRIUS');
-    // highTemp = temp * 1.1, lowTemp = temp * 0.8
+    // highTemp = temp * 1.1, lowTemp = temp * 0.8, prominenceBaseTemp = temp * 0.8
     expect(sirius.highTemp).toBeCloseTo(9940 * 1.1, 1);
     expect(sirius.lowTemp).toBeCloseTo(9940 * 0.8, 1);
+    // Without the override fix, prominenceBaseTemp would stay at the parser's
+    // A1V estimate (~9750 * 0.8 = 7800), not the catalog-derived 7952.
+    expect(sirius.prominenceBaseTemp).toBeCloseTo(9940 * 0.8, 1);
   });
 });

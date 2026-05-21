@@ -397,9 +397,13 @@ export function lookupHYGStar(nameQuery) {
       params.scale = visualScale;
       params.displayName = `${entry.name} (${entry.spect})`;
 
-      // Override estimated temperatures and color grading with actual catalog values
+      // Override estimated temperatures and color grading with actual catalog values.
+      // prominenceBaseTemp must use the catalog temp too — otherwise the parser's
+      // MK-derived estimate stays (e.g. Sirius parses as A1V → 7800K, but the
+      // catalog says 9940K so prominenceBaseTemp should be 9940 * 0.8 = 7952).
       params.highTemp = entry.temp * 1.1;
       params.lowTemp = entry.temp * 0.8;
+      params.prominenceBaseTemp = entry.temp * 0.8;
       params.colorGrading = kelvinToColorGrading(entry.temp);
       
       // Load actual catalog values from HYG entry instead of estimations
