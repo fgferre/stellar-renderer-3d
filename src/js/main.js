@@ -527,7 +527,7 @@ function enterComparisonMode() {
 
   // Default focus on Sol (index 2 in lineup)
   focusOnComparisonStar(2);
-  updateComparisonLayout();
+  updateComparisonLayout({ retargetCamera: true });
 }
 
 function exitComparisonMode() {
@@ -664,7 +664,10 @@ function focusOnComparisonStar(index) {
   });
   syncAriaPressed();
 
-  // Trigger camera flight to new target star
+  // Trigger camera flight to new target star, respecting the active
+  // distance preset (far/orbit/close). Previously this always picked
+  // orbit, so a user on FAR or SURFACE PROBE who clicked another star
+  // would silently be dropped into orbit distance.
   isFlying = true;
   const starX = star.group.position.x;
   const starScale = star.params.scale;
@@ -676,7 +679,7 @@ function focusOnComparisonStar(index) {
   controls.minDistance = 140.0 * starScale;
 
   flightTargetLookAt.set(starX, 0, 0);
-  flightTargetPos.set(starX, 180 * starScale, 550 * starScale);
+  applyDistancePresetTarget(getActiveDistanceType(), starX, starScale);
 
   // Update HUD telemetry title class code (from spectral classification, not name)
   applyHUDClassForStar(star);
@@ -687,7 +690,13 @@ function focusOnComparisonStar(index) {
   updateComparisonLensFlares();
 }
 
-function updateComparisonLayout() {
+// Recompute the lineup positions and (optionally) retarget the autopilot to
+// the focused star. retargetCamera should be true only for events that
+// actually change layout geometry — scale-mode toggle and comparison-mode
+// entry. GUI slider changes and the reset button also call this to refresh
+// per-star scale/position arrays, but those must NOT yank the camera back
+// to focus mid-interaction.
+function updateComparisonLayout({ retargetCamera = false } = {}) {
   if (!isComparisonMode) return;
 
   comparisonBasePositions = [];
@@ -740,28 +749,39 @@ function updateComparisonLayout() {
     });
   }
 
-  // Adjust controls and camera flight target dynamically
+  // Adjust controls and (optionally) camera flight target dynamically
   if (activeFocusedStar) {
     const starX = activeFocusedStar.group.position.x;
     const starScale = activeFocusedStar.params.scale;
     controls.minDistance = 140.0 * starScale;
 
-    // Always re-trigger an autopilot flight to the focused star at its new
-    // layout position. Previously the non-flying branch only nudged
-    // controls.target.x, leaving camera.position at the old X — toggling
-    // scale modes could send the focused star off-screen, or in Real mode
-    // could leave the camera inside the body of a giant (Betelgeuse,
-    // UY Scuti, etc.) after the relayout grew the star.
-    isFlying = true;
-    flightTargetLookAt.set(starX, 0, 0);
-    const distType = document.querySelector('.nav-btn[data-distance].active')?.getAttribute('data-distance') || 'orbit';
-    if (distType === 'far') {
-      flightTargetPos.set(starX, 2500 * starScale, 9000 * starScale);
-    } else if (distType === 'orbit') {
-      flightTargetPos.set(starX, 180 * starScale, 550 * starScale);
-    } else if (distType === 'close') {
-      flightTargetPos.set(starX, 35 * starScale, 145 * starScale);
+    if (retargetCamera) {
+      // Re-trigger an autopilot flight to the focused star at its new layout
+      // position. Without this, toggling scale modes could send the focused
+      // star off-screen, or in Real mode leave the camera inside a giant's
+      // body (Betelgeuse, UY Scuti, etc.) after the relayout grew the star.
+      isFlying = true;
+      flightTargetLookAt.set(starX, 0, 0);
+      applyDistancePresetTarget(getActiveDistanceType(), starX, starScale);
     }
+  }
+}
+
+// Active distance preset selector reflected by the autopilot buttons.
+function getActiveDistanceType() {
+  return document.querySelector('.nav-btn[data-distance].active')?.getAttribute('data-distance') || 'orbit';
+}
+
+// Sets flightTargetPos to the position implied by (distType, starX, starScale).
+// Single source of truth for focus, nav-button clicks, and layout retargeting.
+function applyDistancePresetTarget(distType, starX, starScale) {
+  if (distType === 'far') {
+    flightTargetPos.set(starX, 2500 * starScale, 9000 * starScale);
+  } else if (distType === 'close') {
+    flightTargetPos.set(starX, 35 * starScale, 145 * starScale);
+  } else {
+    // orbit (default)
+    flightTargetPos.set(starX, 180 * starScale, 550 * starScale);
   }
 }
 
@@ -868,7 +888,9 @@ function stopCinematicFlyby() {
   focusOnComparisonStar(2);
 }
 
-function updateCinematicCamera(elapsedTime, delta) {
+// Drives the choreographed flyby tracks. Reads the module-level cinematicTime
+// directly — no params needed.
+function updateCinematicCamera() {
   if (comparisonBasePositions.length === 0) return;
 
   const pos0 = comparisonBasePositions[0]; // Sirius B
@@ -1021,14 +1043,7 @@ function setupHUDBindings() {
       const starX = activeStar.group.position.x;
 
       flightTargetLookAt.set(starX, 0, 0);
-
-      if (distType === 'far') {
-        flightTargetPos.set(starX, 2500 * currentScale, 9000 * currentScale); // Systemic view (Far)
-      } else if (distType === 'orbit') {
-        flightTargetPos.set(starX, 180 * currentScale, 550 * currentScale); // Stable Orbit
-      } else if (distType === 'close') {
-        flightTargetPos.set(starX, 35 * currentScale, 145 * currentScale); // Surface probe view
-      }
+      applyDistancePresetTarget(distType, starX, currentScale);
     });
   });
 
@@ -1052,7 +1067,7 @@ function setupHUDBindings() {
       scaleRealBtn.classList.remove('active');
       syncAriaPressed();
       comparisonScaleMode = 'visual';
-      updateComparisonLayout();
+      updateComparisonLayout({ retargetCamera: true });
       updateComparisonLensFlares();
     });
 
@@ -1061,7 +1076,7 @@ function setupHUDBindings() {
       scaleVisualBtn.classList.remove('active');
       syncAriaPressed();
       comparisonScaleMode = 'real';
-      updateComparisonLayout();
+      updateComparisonLayout({ retargetCamera: true });
       updateComparisonLensFlares();
     });
   }
@@ -1322,9 +1337,8 @@ function animate() {
     // resuming a hidden tab during a cinematic flyby can fast-forward past
     // entire takes (the choreography branches at fixed time thresholds —
     // 6s, 7s, 16s — so a single large delta could skip a take entirely).
-    const cinematicDelta = Math.min(delta, 0.1);
-    cinematicTime += cinematicDelta;
-    updateCinematicCamera(elapsed, cinematicDelta);
+    cinematicTime += Math.min(delta, 0.1);
+    updateCinematicCamera();
   } else if (isFlying) {
     // Frame-rate independent exponential decay: at delta = 1/60s, lerpFactor == flightSpeed
     // exactly (same feel as the old 60-FPS-tuned constant). Clamp delta to avoid huge
