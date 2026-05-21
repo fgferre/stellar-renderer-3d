@@ -1318,8 +1318,13 @@ function animate() {
 
   // 1. Process flight autopilot or cinematic camera
   if (isCinematicMode) {
-    cinematicTime += delta;
-    updateCinematicCamera(elapsed, delta);
+    // Clamp delta consistent with the shader/autopilot paths. Without this,
+    // resuming a hidden tab during a cinematic flyby can fast-forward past
+    // entire takes (the choreography branches at fixed time thresholds —
+    // 6s, 7s, 16s — so a single large delta could skip a take entirely).
+    const cinematicDelta = Math.min(delta, 0.1);
+    cinematicTime += cinematicDelta;
+    updateCinematicCamera(elapsed, cinematicDelta);
   } else if (isFlying) {
     // Frame-rate independent exponential decay: at delta = 1/60s, lerpFactor == flightSpeed
     // exactly (same feel as the old 60-FPS-tuned constant). Clamp delta to avoid huge
