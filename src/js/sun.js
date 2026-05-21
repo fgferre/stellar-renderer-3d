@@ -252,6 +252,11 @@ export class Sun {
   }
 
   updateLensFlares() {
+    // Record the inputs that determine flare appearance so applyCurrentParams
+    // can skip the rebuild when nothing relevant changed.
+    this._lastFlareTemp = this.params.highTemp;
+    this._lastFlareEnabled = this.params.lensFlaresEnabled;
+
     // Clear existing flare elements. Lensflare owns an internal material and
     // render target — dispose them before unparenting or each rebuild leaks
     // GPU resources. The CanvasTextures used by addElement are tracked
@@ -484,7 +489,18 @@ export class Sun {
     this.coronaMaterial.uniforms.uCoronaDensity.value = this.params.coronaDensity;
     this.coronaMaterial.uniforms.uColorGrading.value = this.params.colorGrading;
 
-    this.updateLensFlares();
+    // Flares only depend on highTemp (color category) and lensFlaresEnabled.
+    // Skip the rebuild when neither changed — otherwise every slider drag
+    // (convection, oblateness, etc.) tears down and recreates 3 CanvasTextures
+    // per star × 12 stars in comparison mode.
+    if (
+      this._lastFlareTemp !== this.params.highTemp ||
+      this._lastFlareEnabled !== this.params.lensFlaresEnabled
+    ) {
+      this._lastFlareTemp = this.params.highTemp;
+      this._lastFlareEnabled = this.params.lensFlaresEnabled;
+      this.updateLensFlares();
+    }
   }
 
   // Reset parameters in the active preset slot back to their preset defaults
