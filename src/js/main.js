@@ -1166,10 +1166,14 @@ function updateAutoExposure(distance) {
   // the ceiling; proximity can only hide, never re-enable against the user's wish.
   // Uses flareGroup.visible (cheap) instead of mutating params + recreating textures
   // (expensive, and would clobber the user's preference on the next zoom-in/zoom-out cycle).
+  // In comparison mode the toggle is a global preference: read sun.params, not the per-star
+  // params (which may still hold the default `true` from construction). Without this, every
+  // frame would silently re-enable flares after the user turned them off.
   const flareThreshold = 170.0 * scale;
   if (star.flareGroup) {
     const tooClose = distance < flareThreshold;
-    star.flareGroup.visible = star.params.lensFlaresEnabled && !tooClose;
+    const enabled = isComparisonMode ? sun.params.lensFlaresEnabled : star.params.lensFlaresEnabled;
+    star.flareGroup.visible = enabled && !tooClose;
   }
 }
 
