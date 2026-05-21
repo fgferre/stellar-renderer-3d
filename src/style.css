@@ -548,7 +548,10 @@ html, body {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 10;
+  /* Below #space-hud and #control-panel (both z-index: 10) so labels never
+     intercept HUD/control clicks when they happen to overlap. Above the
+     canvas (z-index: 1) so labels still render in front of the scene. */
+  z-index: 5;
   display: none;
   overflow: hidden;
 }
