@@ -734,21 +734,22 @@ function updateComparisonLayout() {
     const starX = activeFocusedStar.group.position.x;
     const starScale = activeFocusedStar.params.scale;
     controls.minDistance = 140.0 * starScale;
-    
-    if (isFlying) {
-      flightTargetLookAt.set(starX, 0, 0);
-      // Retarget flight to correct Y/Z depending on new scale
-      const distType = document.querySelector('.nav-btn[data-distance].active')?.getAttribute('data-distance') || 'orbit';
-      if (distType === 'far') {
-        flightTargetPos.set(starX, 2500 * starScale, 9000 * starScale);
-      } else if (distType === 'orbit') {
-        flightTargetPos.set(starX, 180 * starScale, 550 * starScale);
-      } else if (distType === 'close') {
-        flightTargetPos.set(starX, 35 * starScale, 145 * starScale);
-      }
-    } else {
-      // If not flying, shift OrbitControls target to new X coordinate immediately
-      controls.target.x = starX;
+
+    // Always re-trigger an autopilot flight to the focused star at its new
+    // layout position. Previously the non-flying branch only nudged
+    // controls.target.x, leaving camera.position at the old X — toggling
+    // scale modes could send the focused star off-screen, or in Real mode
+    // could leave the camera inside the body of a giant (Betelgeuse,
+    // UY Scuti, etc.) after the relayout grew the star.
+    isFlying = true;
+    flightTargetLookAt.set(starX, 0, 0);
+    const distType = document.querySelector('.nav-btn[data-distance].active')?.getAttribute('data-distance') || 'orbit';
+    if (distType === 'far') {
+      flightTargetPos.set(starX, 2500 * starScale, 9000 * starScale);
+    } else if (distType === 'orbit') {
+      flightTargetPos.set(starX, 180 * starScale, 550 * starScale);
+    } else if (distType === 'close') {
+      flightTargetPos.set(starX, 35 * starScale, 145 * starScale);
     }
   }
 }
