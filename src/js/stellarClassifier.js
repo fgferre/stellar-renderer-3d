@@ -118,6 +118,8 @@ export function parseMKClassification(spectralString) {
   // Apply mass scaling factor for giants and supergiants
   if (isSupergiant) {
     mass = Math.max(20.0, mass * 2.0); // Supergiants are highly massive
+  } else if (lumClass === 'II') {
+    mass = Math.max(4.0, mass * 1.6); // Bright giants — between III and I
   } else if (lumClass === 'III') {
     mass = Math.max(1.5, mass * 1.2); // Giants
   }
@@ -126,6 +128,8 @@ export function parseMKClassification(spectralString) {
   let starLum = Math.pow(mass, 3.5);
   if (isSupergiant) {
     starLum = Math.max(15000.0, Math.pow(mass, 3.8) * 15.0);
+  } else if (lumClass === 'II') {
+    starLum = Math.max(500.0, Math.pow(mass, 3.5) * 8.0);
   } else if (lumClass === 'III') {
     starLum = Math.max(50.0, Math.pow(mass, 3.5) * 5.0);
   } else if (lumClass === 'VII' || specClass.startsWith('D')) {
@@ -217,6 +221,28 @@ export function parseMKClassification(spectralString) {
 
     pulseAmplitude = 0.04; // Supergiants pulsate (breath animation)
     pulseFrequency = 0.35;
+  } else if (lumClass === 'II') {
+    // Bright Giants: between III giants and I supergiants in scale and turbulence
+    scale = 2.0;
+    convectionSpeed = (specClass === 'O' || specClass === 'B') ? 0.30 : 0.07;
+    noiseScale = (specClass === 'O' || specClass === 'B') ? 0.24 : 0.50;
+    sunspotThreshold = (specClass === 'O' || specClass === 'B') ? 0.08 : 0.38;
+    plageIntensity = (specClass === 'O' || specClass === 'B') ? 1.0 : 0.45;
+
+    prominenceHeight = (specClass === 'O' || specClass === 'B') ? 5.5 : 16.0;
+    prominenceSpeed = (specClass === 'O' || specClass === 'B') ? 0.22 : 0.05;
+    prominenceEdgeFade = (specClass === 'O' || specClass === 'B') ? 7.0 : 4.1;
+
+    coronaDensity = (specClass === 'O' || specClass === 'B') ? 0.9 : 1.3;
+    coronaSpeed = (specClass === 'O' || specClass === 'B') ? 0.2 : 0.06;
+
+    rotationSpeed = (specClass === 'O' || specClass === 'B') ? 0.018 : 0.005;
+    oblateness = (specClass === 'O' || specClass === 'B') ? 0.97 : 1.0;
+
+    if (specClass === 'M' || specClass === 'K') {
+      pulseAmplitude = 0.03;
+      pulseFrequency = 0.30;
+    }
   } else if (lumClass === 'III') {
     // Giants: Medium-large size, slower bubbling
     scale = 1.7;
@@ -224,14 +250,14 @@ export function parseMKClassification(spectralString) {
     noiseScale = 0.40;
     sunspotThreshold = (specClass === 'O' || specClass === 'B') ? 0.05 : 0.40;
     plageIntensity = 0.50;
-    
+
     prominenceHeight = 15.0;
     prominenceSpeed = 0.06;
     prominenceEdgeFade = 4.2;
-    
+
     coronaDensity = 1.2;
     coronaSpeed = 0.07;
-    
+
     rotationSpeed = 0.008;
     oblateness = 1.0;
 

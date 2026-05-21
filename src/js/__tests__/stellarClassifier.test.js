@@ -58,6 +58,19 @@ describe('parseMKClassification', () => {
     expect(a.specClass).toBe(b.specClass);
   });
 
+  it('parses bright giants (II) as between III and I in mass and scale', () => {
+    const dwarf = parseMKClassification('A9V');
+    const brightGiant = parseMKClassification('A9II');
+    const giant = parseMKClassification('A9III');
+    const supergiant = parseMKClassification('A9I');
+    expect(brightGiant.lumClass).toBe('II');
+    expect(brightGiant.mass).toBeGreaterThan(dwarf.mass);
+    expect(brightGiant.mass).toBeGreaterThan(giant.mass);
+    expect(brightGiant.mass).toBeLessThan(supergiant.mass);
+    expect(brightGiant.scale).toBeGreaterThan(giant.scale);
+    expect(brightGiant.scale).toBeLessThan(supergiant.scale);
+  });
+
   it('parses Ia and Ib supergiant variants as supergiants', () => {
     const ia = parseMKClassification('M2Ia');
     const ib = parseMKClassification('M2Ib');
@@ -153,6 +166,17 @@ describe('lookupHYGStar', () => {
     expect(betelgeuse.scale).toBeGreaterThan(1.0);
     expect(proxima.scale).toBeGreaterThanOrEqual(0.35);
     expect(proxima.scale).toBeLessThan(1.0);
+  });
+
+  it('resolves Canopus (A9II bright giant) with catalog values', () => {
+    const canopus = lookupHYGStar('CANOPUS');
+    expect(canopus).not.toBeNull();
+    expect(canopus.lumClass).toBe('II');
+    // Catalog overrides ensure the bright-giant procedural defaults don't
+    // produce nonsense — final values must match the HYG entry.
+    expect(canopus.mass).toBe(HYG_DATABASE.CANOPUS.mass);
+    expect(canopus.radius).toBe(HYG_DATABASE.CANOPUS.radius);
+    expect(canopus.lum).toBe(HYG_DATABASE.CANOPUS.lum);
   });
 
   it('applies per-star overrides for Vega oblateness', () => {
