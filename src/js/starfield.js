@@ -71,9 +71,18 @@ export function createStarfield(numStars = 8000) {
       uTime: { value: 0 }
     },
     transparent: true,
-    depthWrite: false, // Prevent particle bounding boxes from clipping stars
+    // Sky-dome behavior: no depth read or write, drawn first via renderOrder.
+    // The starfield shell sits at 25-35k from the camera, but in Real scale
+    // comparison mode UY Scuti's mesh radius is ~170k. Without disabling
+    // depth test, the (closer) starfield would write color over the
+    // (farther) photosphere — background stars appeared on top of giants.
+    depthTest: false,
+    depthWrite: false,
     blending: THREE.AdditiveBlending
   });
 
-  return new THREE.Points(geometry, material);
+  const points = new THREE.Points(geometry, material);
+  // Render before any other object regardless of scene-tree order.
+  points.renderOrder = -1;
+  return points;
 }
