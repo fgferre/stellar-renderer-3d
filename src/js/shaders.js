@@ -383,9 +383,14 @@ void main() {
   // Use ascending edges + invert: GLSL ES spec leaves edge0 >= edge1 undefined
   float heightFade = 1.0 - smoothstep(0.0, max(0.0001, uProminenceHeight * 1.5), vDisplacement);
   
-  // Edge opacity falloff (Fades out when looking straight-on, highlighting prominences on solar limb)
+  // Edge opacity falloff (fades out when looking straight-on, highlighting
+  // prominences on the solar limb). vNormal is interpolated between vertex
+  // normals — interpolation doesn't preserve unit length, so renormalize
+  // before the dot product or pow() amplifies small length errors into
+  // visible banding near the limb.
+  vec3 nVNormal = normalize(vNormal);
   vec3 viewDir = vec3(0.0, 0.0, 1.0);
-  float edgeGlow = 1.0 - clamp(dot(vNormal, viewDir), 0.0, 1.0);
+  float edgeGlow = 1.0 - clamp(dot(nVNormal, viewDir), 0.0, 1.0);
   float edgeOpacity = pow(edgeGlow, uEdgeFade);
 
   // Blend prominence loops with polar jet columns
