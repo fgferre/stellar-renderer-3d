@@ -273,14 +273,19 @@ export class Sun {
     this._lastFlareColorKey = this._flareColorKeyForTemp(this.params.highTemp);
     this._lastFlareEnabled = this.params.lensFlaresEnabled;
 
-    // Clear existing flare elements. Lensflare.dispose() owns the full
-    // lifecycle: its internal material/render target AND the element textures
-    // (currentGlow/Ring/Hex passed via addElement). Calling child.dispose()
-    // is sufficient — manually disposing the CanvasTextures again afterwards
-    // would be double-ownership.
+    // Clear existing flare elements. Lensflare.dispose() owns the internal
+    // shader material/render target AND the element textures
+    // (currentGlow/Ring/Hex passed via addElement). It does NOT, however,
+    // dispose the MeshBasicMaterial the Mesh super-class is constructed
+    // with — that leaks one material per rebuild. Dispose it explicitly.
+    // Geometry is the static Lensflare.Geometry shared across all
+    // instances and must NOT be disposed here.
     while (this.flareGroup.children.length > 0) {
       const child = this.flareGroup.children[0];
       if (typeof child.dispose === 'function') child.dispose();
+      if (child.material && typeof child.material.dispose === 'function') {
+        child.material.dispose();
+      }
       this.flareGroup.remove(child);
     }
     // Drop the JS-side references so the next build doesn't accidentally keep
