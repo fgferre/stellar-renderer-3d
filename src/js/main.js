@@ -105,7 +105,7 @@ function init() {
   camera.position.set(0, 300, 1000); // Standard starting view
 
   // 2. WebGL Renderer configuration (HDR & Tone mapping)
-  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", logarithmicDepthBuffer: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap at 2 for performance
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
