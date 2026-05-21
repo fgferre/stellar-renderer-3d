@@ -1174,7 +1174,7 @@ function updateAutoExposure(distance) {
 }
 
 // telemetry calculations & updates
-function updateTelemetry(distance, delta) {
+function updateTelemetry(distance) {
   const star = (isComparisonMode && activeFocusedStar) ? activeFocusedStar : sun;
   if (!star || !star.params) return;
 
@@ -1269,7 +1269,7 @@ function animate() {
   
   const elapsedUnscaled = clock.getElapsedTime();
   if (elapsedUnscaled - lastTelemetryUpdateTime > 0.1) {
-    updateTelemetry(cameraDistance, delta);
+    updateTelemetry(cameraDistance);
     lastTelemetryUpdateTime = elapsedUnscaled;
   }
 
