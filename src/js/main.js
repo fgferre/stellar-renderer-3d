@@ -473,8 +473,11 @@ function exitComparisonMode() {
     sun.applyCurrentParams();
   }
 
-  // Restore camera defaults
+  // Restore camera defaults — including minDistance, which would otherwise
+  // stay at the last focused star's scale-based value (e.g. ~4200 after
+  // focusing Betelgeuse) and prevent the user from zooming back into Sol.
   controls.maxDistance = 150000.0;
+  controls.minDistance = 140.0 * sun.params.scale;
   camera.far = 500000.0;
   camera.updateProjectionMatrix();
 
