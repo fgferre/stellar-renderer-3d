@@ -1411,6 +1411,11 @@ function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 
+  // Re-apply pixel ratio: browser zoom changes and monitor swaps (different
+  // DPI) mutate window.devicePixelRatio at runtime, but renderer caches the
+  // value from its last setPixelRatio call. Without this, moving the window
+  // to a Retina display leaves the canvas at the original integer scale.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
   if (bloomPass) {
