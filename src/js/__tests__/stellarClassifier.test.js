@@ -82,6 +82,21 @@ describe('parseMKClassification', () => {
     expect(ib.mass).toBeGreaterThan(dwarf.mass);
   });
 
+  it('accepts decimal subclass like O9.5V', () => {
+    const o9 = parseMKClassification('O9V');
+    const o95 = parseMKClassification('O9.5V');
+    const o10 = parseMKClassification('O10V'); // not valid, regex floors to single digit
+    expect(o95).not.toBeNull();
+    expect(o95.specClass).toBe('O');
+    expect(o95.spect).toBe('O9.5V');
+    // O temperature formula: 50000 - subclass * 2000
+    // O9V → 50000 - 18000 = 32000 → highTemp = 32000 * 1.1
+    // O9.5V → 50000 - 19000 = 31000 → highTemp = 31000 * 1.1
+    expect(o95.highTemp).toBeLessThan(o9.highTemp);
+    expect(o95.highTemp).toBeCloseTo(31000 * 1.1, 1);
+    expect(o10).toBeNull(); // '10' is two chars — regex expects single digit
+  });
+
   it('returns null for unparseable input', () => {
     expect(parseMKClassification('')).toBeNull();
     expect(parseMKClassification('xyz')).toBeNull();

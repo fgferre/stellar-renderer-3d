@@ -50,15 +50,17 @@ export function parseMKClassification(spectralString) {
   
   // Regex to extract:
   // 1. Spectral class: O, B, A, F, G, K, M, or white dwarfs DA, DB, DC, DQ, DX
-  // 2. Subclass digit: 0-9 (optional, default to 5 if missing)
+  // 2. Subclass: 0-9, optionally with one decimal place (e.g. O9.5 for Mintaka)
   // 3. Luminosity Class: Ia, Ib, I, II, III, IV, V, VI, VII (optional, default to V)
-  const regex = /^([OBAFGKM]|D[ABCOQXY])([0-9]?)(I[AB]|I{1,3}|IV|V|VI|VII)?$/;
+  const regex = /^([OBAFGKM]|D[ABCOQXY])([0-9](?:\.[0-9])?)?(I[AB]|I{1,3}|IV|V|VI|VII)?$/;
   const match = cleanStr.match(regex);
-  
+
   if (!match) return null;
-  
+
   const specClass = match[1];
-  const subclass = match[2] !== '' ? parseInt(match[2], 10) : 5;
+  // parseFloat handles both '9' and '9.5'; subclass propagates into the
+  // temperature/mass linear formulas where fractional values are sensible.
+  const subclass = match[2] !== undefined && match[2] !== '' ? parseFloat(match[2]) : 5;
   let lumClass = match[3] || 'V';
   
   // If it is a white dwarf prefix like "DA", set luminosity class to VII (White dwarf)

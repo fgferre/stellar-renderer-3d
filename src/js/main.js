@@ -475,7 +475,12 @@ function enterComparisonMode() {
       const labelDiv = document.createElement('div');
       labelDiv.className = 'star-label-3d';
       labelDiv.id = `star-label-${index}`;
-      
+      // Make labels keyboard-actionable: ARIA button semantics, focusable,
+      // and an accessible name derived from the star.
+      labelDiv.setAttribute('role', 'button');
+      labelDiv.setAttribute('tabindex', '0');
+      labelDiv.setAttribute('aria-label', `Focus on ${star.displayName}`);
+
       // Card elements styled with a line pointing down
       labelDiv.innerHTML = `
         <div class="label-card">
@@ -484,8 +489,13 @@ function enterComparisonMode() {
         </div>
         <div class="label-glow-line"></div>
       `;
-      labelDiv.addEventListener('click', () => {
-        focusOnComparisonStar(index);
+      const activate = () => focusOnComparisonStar(index);
+      labelDiv.addEventListener('click', activate);
+      labelDiv.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          activate();
+        }
       });
       labelsContainer.appendChild(labelDiv);
     });

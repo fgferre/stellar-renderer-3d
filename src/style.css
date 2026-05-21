@@ -601,10 +601,25 @@ html, body {
   min-width: 130px;
 }
 
-.star-label-3d:hover .label-card {
+.star-label-3d:hover .label-card,
+.star-label-3d:focus-visible .label-card {
   border-top-color: #00ffcc;
   transform: translateY(-5px);
   box-shadow: 0 15px 30px rgba(0, 255, 204, 0.25);
+}
+
+.star-label-3d:focus-visible {
+  outline: none; /* visual handled by .label-card border + box-shadow above */
+}
+
+/* Restore a visible focus ring on the MK input — the inline style sets
+   outline: none for design reasons, but :focus-visible keyboard users
+   still need a clear indicator. Uses border + outer glow so it lives well
+   with the dark HUD palette. */
+#input-custom-class:focus-visible {
+  outline: 2px solid rgba(0, 168, 255, 0.7) !important;
+  outline-offset: 2px;
+  border-color: rgba(0, 168, 255, 0.85) !important;
 }
 
 .star-label-3d.active-focus .label-card {
