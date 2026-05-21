@@ -7,7 +7,7 @@ An interactive, physically-grounded WebGL 2 simulation of the Sun and other stel
 ## Features
 
 - **Procedural shader stack** — surface FBM, magnetic plages, prominence vertex displacement, billboarded volumetric corona, polar jets for high-energy stars.
-- **Stellar classification engine** — paste any Morgan-Keenan code (`O5I`, `K5III`, `DA2`, `B1Ia`...) and the renderer derives temperature, mass, radius, luminosity, rotation, oblateness, jet intensity, and pulsation from the spectral class.
+- **Stellar classification engine** — paste a Morgan-Keenan code (main classes `O`/`B`/`A`/`F`/`G`/`K`/`M` and white-dwarf prefixes `DA`/`DB`/`DC`/`DO`/`DQ`/`DX`/`DY`, subclass 0–9 with optional one-decimal precision, luminosity classes `Ia`/`Ib`/`I`/`II`/`III`/`IV`/`V`/`VI`/`VII`) and the renderer derives temperature, mass, radius, luminosity, rotation, oblateness, jet intensity, and pulsation from the spectral class. Examples: `O9.5III`, `K5III`, `DA2`, `B1Ia`, `A9II` (Canopus).
 - **HYG catalog presets** — Sirius A/B, Proxima Centauri, Sun, Vega, Arcturus, Aldebaran, Rigel, Deneb, Antares, Betelgeuse, UY Scuti, etc. with real catalog values overriding MK estimates.
 - **Comparison Mode** — line up 12 stars at once. Toggle between *Visual (log)* and *Real (linear)* scale. Cinematic flyby choreography.
 - **Cockpit HUD** — live telemetry: Kepler-Newton orbital velocity, equilibrium temperature, distance in AU, mass, radius, luminosity, rotational velocity.
