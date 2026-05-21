@@ -45,8 +45,7 @@ src/
 │   ├── shaders.js              # GLSL strings: surface, prominence, corona, starfield
 │   ├── stellarClassifier.js    # MK parser, kelvin→RGB, HYG catalog, derived params
 │   └── __tests__/              # vitest suite
-├── style.css                   # HUD, glass panels, responsive breakpoints
-└── assets/                     # (project assets)
+└── style.css                   # HUD, glass panels, responsive breakpoints
 index.html                      # entry point, HUD scaffold
 ```
 
