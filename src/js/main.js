@@ -305,7 +305,20 @@ function setupGUI() {
   fSurface.add(sun.params, 'limbBase', 0.0, 1.0, 0.05).name('Limb Darkening Base').onChange(onGUIParameterChange);
   fSurface.addColor(guiColorProxies, 'starColor').name('Star Tint Color').onChange((val) => {
     const c = new THREE.Color(val);
-    sun.params.colorGrading.set(c.r * 1.25, c.g * 1.25, c.b * 1.25);
+    // Preserve the current intensity magnitude when swapping hue. Pre-fix,
+    // a hardcoded *1.25 stomped over preset-specific intensities — Blue
+    // Supergiant ships at colorGrading max=1.45 and got flattened to 1.25
+    // any time the user touched the picker. Now we keep the existing max
+    // and only swap the relative RGB ratio.
+    const currentMax = Math.max(
+      sun.params.colorGrading.x,
+      sun.params.colorGrading.y,
+      sun.params.colorGrading.z
+    );
+    const targetMax = Math.max(c.r, c.g, c.b);
+    const intensity = currentMax > 0 ? currentMax : 1.25;
+    const scale = targetMax > 0 ? intensity / targetMax : 1.0;
+    sun.params.colorGrading.set(c.r * scale, c.g * scale, c.b * scale);
     onGUIParameterChange();
   });
   fSurface.addColor(guiColorProxies, 'plageColor').name('Plage Tint Color').onChange((val) => {
