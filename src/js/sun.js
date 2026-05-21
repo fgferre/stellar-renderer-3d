@@ -225,6 +225,13 @@ export class Sun {
     });
 
     this.promMesh = new THREE.Mesh(this.promGeometry, this.promMaterial);
+    // The shared geometry has a bounding sphere of radius 101, but the vertex
+    // shader displaces along the normal by up to params.prominenceHeight
+    // (GUI ceiling 50, supergiant defaults can reach 18). Stock frustum
+    // culling uses the original bounds, so prominence loops at the frustum
+    // edge could vanish even when their displaced positions are still in
+    // view. Skip culling — one extra mesh draw per star is cheap.
+    this.promMesh.frustumCulled = false;
     this.group.add(this.promMesh);
   }
 
