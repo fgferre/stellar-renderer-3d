@@ -163,6 +163,10 @@ export function parseMKClassification(spectralString) {
     vRot = 20.0;
   } else if (isSupergiant) {
     vRot = (specClass === 'O' || specClass === 'B') ? 45.0 : 5.0;
+  } else if (lumClass === 'II') {
+    // Bright giants — between supergiant and class III. Hot II stars retain
+    // some rotational angular momentum; cool II stars slow down on expansion.
+    vRot = (specClass === 'O' || specClass === 'B') ? 25.0 : 8.0;
   } else if (lumClass === 'III') {
     vRot = 12.0;
   } else {
