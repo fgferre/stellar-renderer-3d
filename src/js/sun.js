@@ -264,25 +264,23 @@ export class Sun {
     this._lastFlareTemp = this.params.highTemp;
     this._lastFlareEnabled = this.params.lensFlaresEnabled;
 
-    // Clear existing flare elements. Lensflare owns an internal material and
-    // render target — dispose them before unparenting or each rebuild leaks
-    // GPU resources. The CanvasTextures used by addElement are tracked
-    // separately on this.currentGlow/Ring/Hex and disposed below.
+    // Clear existing flare elements. Lensflare.dispose() owns the full
+    // lifecycle: its internal material/render target AND the element textures
+    // (currentGlow/Ring/Hex passed via addElement). Calling child.dispose()
+    // is sufficient — manually disposing the CanvasTextures again afterwards
+    // would be double-ownership.
     while (this.flareGroup.children.length > 0) {
       const child = this.flareGroup.children[0];
       if (typeof child.dispose === 'function') child.dispose();
       this.flareGroup.remove(child);
     }
-
-    // Dispose of previously generated textures to prevent GPU memory leaks
-    if (this.currentGlowTexture) this.currentGlowTexture.dispose();
-    if (this.currentRingTexture) this.currentRingTexture.dispose();
-    if (this.currentHexTexture) this.currentHexTexture.dispose();
+    // Drop the JS-side references so the next build doesn't accidentally keep
+    // them reachable. The actual GPU resources were freed via child.dispose().
+    this.currentGlowTexture = null;
+    this.currentRingTexture = null;
+    this.currentHexTexture = null;
 
     if (!this.params.lensFlaresEnabled) {
-      this.currentGlowTexture = null;
-      this.currentRingTexture = null;
-      this.currentHexTexture = null;
       return;
     }
 
