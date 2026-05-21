@@ -526,9 +526,13 @@ void main() {
   // Exponential glow decay (gives a bright core and soft atmospheric halo)
   float glow = exp(-8.0 * dist);
 
-  // Twinkle with varied frequency per star for a more natural night sky
+  // Twinkle with varied frequency per star for a more natural night sky.
+  // Clamp to [0, 1]: the raw expression 0.35 + 0.65*sin dips to -0.30 on
+  // half the cycle, which used to produce negative RGB/alpha (silently
+  // clamped by WebGL). Explicit max(0) preserves the same "fully dark
+  // trough" visual as before but without relying on undefined behavior.
   float freq = 1.0 + 1.2 * fract(vPhase * 13.27);
-  float twinkle = 0.35 + 0.65 * sin(uTime * freq + vPhase);
+  float twinkle = max(0.0, 0.35 + 0.65 * sin(uTime * freq + vPhase));
   
   // Cutoff at particle borders to prevent square edge artifacts
   // Use ascending edges + invert: GLSL ES spec leaves edge0 >= edge1 undefined
