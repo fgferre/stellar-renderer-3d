@@ -174,10 +174,10 @@ describe('lookupHYGStar', () => {
     expect(vega.displayName).toContain('Vega');
   });
 
-  it('compresses extreme radius to a bounded visual scale [0.35, 2.8]', () => {
+  it('compresses extreme radius to a bounded visual scale [0.35, 2.6]', () => {
     const betelgeuse = lookupHYGStar('BETELGEUSE'); // radius 950
     const proxima = lookupHYGStar('PROXIMA');       // radius 0.154
-    expect(betelgeuse.scale).toBeLessThanOrEqual(2.8);
+    expect(betelgeuse.scale).toBeLessThanOrEqual(2.6);
     expect(betelgeuse.scale).toBeGreaterThan(1.0);
     expect(proxima.scale).toBeGreaterThanOrEqual(0.35);
     expect(proxima.scale).toBeLessThan(1.0);

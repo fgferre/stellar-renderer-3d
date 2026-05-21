@@ -385,7 +385,9 @@ export function lookupHYGStar(nameQuery) {
     // Parse the spectral class of this star to get the base parameters
     const params = parseMKClassification(entry.spect);
     if (params) {
-      // Compress extreme physical radius to visual scale bounds [0.35, 2.8]
+      // Compress extreme physical radius to visual scale bounds [0.35, 2.6].
+      // Upper cap is 1.0 + Math.min(1.6, ...) = 2.6. Lower cap is 0.35 by
+      // Math.max() floor below.
       let visualScale = 1.0;
       if (realRadius > 1.0) {
         visualScale = 1.0 + Math.min(1.6, Math.log10(realRadius) * 0.55);
