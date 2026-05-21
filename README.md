@@ -52,7 +52,7 @@ index.html                      # entry point, HUD scaffold
 
 ## Comparison Mode physics notes
 
-In **Visual (log)** mode, each star uses a `visualScaleDefault` so the line-up is didactic — Sirius B is visibly tiny, UY Scuti is visibly huge, but neither breaks the layout. In **Real (linear)** mode, each star uses its actual `radius` in solar radii: UY Scuti (≈1700 R☉) renders ~200,000× larger than Sirius B (≈0.0084 R☉), so the camera far-plane stretches to 30 million scene units and `logarithmicDepthBuffer` keeps depth precision usable across the full range.
+In **Visual (log)** mode, each star uses a `visualScaleDefault` so the line-up is didactic — Sirius B is visibly tiny, UY Scuti is visibly huge, but neither breaks the layout. In **Real (linear)** mode, each star uses its actual `radius` in solar radii: UY Scuti (≈1700 R☉) renders ~200,000× larger than Sirius B (≈0.0084 R☉), so the camera far-plane stretches to 30 million scene units. Depth precision is not a practical issue here because every renderable surface uses `depthWrite: false` for transparent layers (corona, prominences) and the only opaque object per star is the core sphere — different stars sit on the X axis far apart so their cores never overlap in projected depth.
 
 ## Acknowledgements
 
