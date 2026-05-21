@@ -93,20 +93,48 @@ const hudStarClass = document.getElementById('hud-star-class').querySelector('.r
 const loadProgressBar = document.getElementById('load-progress');
 const loaderScreen = document.getElementById('loader');
 
+// Replace the loader content with an error message when the app cannot start
+// (unsupported GPU, lost context, runtime crash during init). Without this,
+// users hit a forever 'INITIALIZING STELLAR SHADERS...' screen with no clue.
+function showLoaderError(message) {
+  if (!loaderScreen) return;
+  loaderScreen.classList.remove('fade-out');
+  const text = loaderScreen.querySelector('.loader-text');
+  if (text) {
+    text.textContent = 'UNABLE TO INITIALIZE';
+    text.style.color = '#ff3838';
+  }
+  const progress = loaderScreen.querySelector('.loader-progress');
+  if (progress) progress.style.display = 'none';
+  const corona = loaderScreen.querySelector('.solar-eclipse-loader');
+  if (corona) corona.style.opacity = '0.3';
+  const details = document.createElement('div');
+  details.style.cssText = 'margin-top: 16px; font-family: Outfit, sans-serif; font-size: 0.85rem; color: rgba(255,255,255,0.7); max-width: 360px; text-align: center; line-height: 1.5;';
+  details.textContent = message;
+  loaderScreen.querySelector('.loader-content')?.appendChild(details);
+}
+
 // Initialize WebGL Application
 function init() {
-  clock = new THREE.Clock();
+  try {
+    clock = new THREE.Clock();
 
-  // 1. Scene & Camera Setup
-  scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x020205, 0.00003); // Softer far fog
+    // 1. Scene & Camera Setup
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x020205, 0.00003); // Softer far fog
 
-  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1.0, 500000);
-  camera.position.set(0, 300, 1000); // Standard starting view
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1.0, 500000);
+    camera.position.set(0, 300, 1000); // Standard starting view
 
-  // 2. WebGL Renderer configuration (HDR & Tone mapping)
-  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-  renderer.setSize(window.innerWidth, window.innerHeight);
+    // 2. WebGL Renderer configuration (HDR & Tone mapping)
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+
+    if (!renderer.capabilities.isWebGL2) {
+      showLoaderError('This simulation requires WebGL 2.0. Your browser or GPU does not appear to support it. Try a recent Chrome, Firefox, or Edge build on a desktop GPU.');
+      return;
+    }
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap at 2 for performance
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
@@ -185,14 +213,21 @@ function init() {
   // 8. Event Listeners
   window.addEventListener('resize', onWindowResize);
 
-  // Dev-only handle for browser-console debugging and automated UI checks.
-  // Vite tree-shakes this branch out of production builds.
-  if (import.meta.env.DEV) {
-    window.__app = { scene, camera, renderer, controls, sun, get isComparisonMode() { return isComparisonMode; }, get activeFocusedStar() { return activeFocusedStar; } };
-  }
+    // Dev-only handle for browser-console debugging and automated UI checks.
+    // Vite tree-shakes this branch out of production builds.
+    if (import.meta.env.DEV) {
+      window.__app = { scene, camera, renderer, controls, sun, get isComparisonMode() { return isComparisonMode; }, get activeFocusedStar() { return activeFocusedStar; } };
+    }
 
-  // Start loop
-  animate();
+    // Start loop
+    animate();
+  } catch (err) {
+    console.error('Stellar Renderer init failed:', err);
+    showLoaderError(
+      'Something went wrong while starting the renderer. Check your browser console for details. ' +
+      'If this persists, the most common cause is a WebGL driver issue — try restarting the browser or updating your GPU drivers.'
+    );
+  }
 }
 
 // Update Loader bar width
