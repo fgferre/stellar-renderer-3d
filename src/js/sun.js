@@ -92,6 +92,14 @@ function createHexagonTexture(colorHex, size = 128) {
   return new THREE.CanvasTexture(canvas);
 }
 
+// Shared immutable geometries. Each Sun instance reuses the same BufferGeometry
+// objects; materials/uniforms/meshes stay per-instance so transforms, scales,
+// visibility, and shader inputs remain independent. In comparison mode this
+// removes ~12x duplication of identical sphere/plane buffers from the GPU.
+const SHARED_CORE_GEOMETRY = new THREE.SphereGeometry(100.0, 80, 80);
+const SHARED_PROM_GEOMETRY = new THREE.SphereGeometry(101.0, 140, 140);
+const SHARED_CORONA_GEOMETRY = new THREE.PlaneGeometry(480.0, 480.0);
+
 export class Sun {
   getDefaultParams() {
     return {
@@ -172,7 +180,7 @@ export class Sun {
 
   // 1. Core Solar Surface Sphere
   initCore() {
-    this.coreGeometry = new THREE.SphereGeometry(100.0, 80, 80);
+    this.coreGeometry = SHARED_CORE_GEOMETRY;
     this.coreMaterial = new THREE.ShaderMaterial({
       vertexShader: surfaceVertexShader,
       fragmentShader: surfaceFragmentShader,
@@ -196,7 +204,7 @@ export class Sun {
   // 2. High-polygon Prominences Warp Shell
   initProminences() {
     // Subdivided sphere for smooth displacement
-    this.promGeometry = new THREE.SphereGeometry(101.0, 140, 140);
+    this.promGeometry = SHARED_PROM_GEOMETRY;
     this.promMaterial = new THREE.ShaderMaterial({
       vertexShader: prominenceVertexShader,
       fragmentShader: prominenceFragmentShader,
@@ -222,8 +230,7 @@ export class Sun {
 
   // 3. Volumetric Corona Billboard Glow
   initCorona() {
-    const coronaSize = 480.0;
-    this.coronaGeometry = new THREE.PlaneGeometry(coronaSize, coronaSize);
+    this.coronaGeometry = SHARED_CORONA_GEOMETRY;
     this.coronaMaterial = new THREE.ShaderMaterial({
       vertexShader: coronaVertexShader,
       fragmentShader: coronaFragmentShader,
