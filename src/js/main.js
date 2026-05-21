@@ -46,7 +46,7 @@ let composer, bloomPass;
 let scaleController = null; // lil-gui controller for the Stellar Visual Scale slider
 let clock, timeSpeed = 1.0;
 // Accumulator for simulated shader time. Decouples shader animation from
-// timeSpeed changes (slider drags) — using clock.getElapsedTime() * timeSpeed
+// timeSpeed changes (slider drags) — using clock.getElapsed() * timeSpeed
 // caused a visible jump whenever the user changed speed (e.g. timeSpeed 1->2
 // at t_real=10s made the multiplied value jump from 10 to 20). Advance per
 // frame instead so changes apply forward in time only.
@@ -117,7 +117,12 @@ function showLoaderError(message) {
 // Initialize WebGL Application
 function init() {
   try {
-    clock = new THREE.Clock();
+    clock = new THREE.Timer();
+    // connect() enables three.js Timer's Page Visibility API integration:
+    // when the tab is hidden, the next delta clamps to 0 instead of returning
+    // the full hidden-duration. Our animate loop also clamps delta to 0.1s
+    // defensively, but Timer's built-in handling is cleaner.
+    clock.connect(document);
 
     // 1. Scene & Camera Setup
     scene = new THREE.Scene();
@@ -1289,6 +1294,9 @@ function updatePhysicalHUD() {
 function animate() {
   requestAnimationFrame(animate);
 
+  // Timer needs an explicit update() per frame so getDelta()/getElapsed()
+  // return consistent values regardless of how many times they're queried.
+  clock.update();
   const delta = clock.getDelta();
   // Clamp to absorb tab-unsuspend gaps so a 5-second backgrounded gap doesn't
   // fast-forward shader animation by 5 seconds.
@@ -1332,7 +1340,7 @@ function animate() {
   // 3. Dynamic Auto-Exposure & Telemetry Updates
   updateAutoExposure(cameraDistance);
   
-  const elapsedUnscaled = clock.getElapsedTime();
+  const elapsedUnscaled = clock.getElapsed();
   if (elapsedUnscaled - lastTelemetryUpdateTime > 0.1) {
     updateTelemetry(cameraDistance);
     lastTelemetryUpdateTime = elapsedUnscaled;
