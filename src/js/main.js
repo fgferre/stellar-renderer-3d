@@ -329,18 +329,31 @@ function setupGUI() {
     }
   });
   
-  // Toggle for render mode (Bloom vs. Direct)
+  // Toggle for render mode (Bloom vs. Direct). Bloom/Exposure controls only
+  // affect output when the composer is active — the custom raw shaders write
+  // gl_FragColor directly, bypassing renderer.toneMapping in direct mode. So
+  // when the user turns Post-bloom off, disable the dependent sliders to
+  // communicate that they have no effect in that mode.
   const renderModeConfig = { useBloom: usePostProcessing };
+  const bloomControllers = [];
+  const setBloomControlsEnabled = (enabled) => {
+    bloomControllers.forEach(c => enabled ? c.enable() : c.disable());
+  };
   fPost.add(renderModeConfig, 'useBloom').name('Render Post-bloom').onChange((val) => {
     usePostProcessing = val;
     if (!val && bloomPass) {
       bloomPass.strength = 0.0;
     }
+    setBloomControlsEnabled(val);
   });
 
-  fPost.add(bloomPass, 'strength', 0.0, 5.0, 0.1).name('Bloom Intensity').listen();
-  fPost.add(bloomPass, 'threshold', 0.0, 1.0, 0.01).name('Bloom Threshold').listen();
-  fPost.add(renderer, 'toneMappingExposure', 0.1, 4.0, 0.05).name('Camera Exposure').listen();
+  bloomControllers.push(
+    fPost.add(bloomPass, 'strength', 0.0, 5.0, 0.1).name('Bloom Intensity').listen(),
+    fPost.add(bloomPass, 'threshold', 0.0, 1.0, 0.01).name('Bloom Threshold').listen(),
+    fPost.add(renderer, 'toneMappingExposure', 0.1, 4.0, 0.05).name('Camera Exposure').listen()
+  );
+  // Initial state matches the default render mode (direct).
+  setBloomControlsEnabled(usePostProcessing);
   
   // Custom control for animation speed
   const timeControl = { speed: 1.0 };
