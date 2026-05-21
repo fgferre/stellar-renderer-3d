@@ -185,6 +185,12 @@ function init() {
   // 8. Event Listeners
   window.addEventListener('resize', onWindowResize);
 
+  // Dev-only handle for browser-console debugging and automated UI checks.
+  // Vite tree-shakes this branch out of production builds.
+  if (import.meta.env.DEV) {
+    window.__app = { scene, camera, renderer, controls, sun, get isComparisonMode() { return isComparisonMode; }, get activeFocusedStar() { return activeFocusedStar; } };
+  }
+
   // Start loop
   animate();
 }
