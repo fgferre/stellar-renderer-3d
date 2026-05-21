@@ -7,6 +7,15 @@
   -webkit-user-drag: none;
 }
 
+/* Telemetry readouts are useful to copy/paste (mass, radius, distance, etc.)
+   — opt them out of the global user-select: none so users can grab the
+   numbers without screenshot OCR. */
+.reading-value,
+.reading-title {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 html, body {
   width: 100%;
   height: 100%;
