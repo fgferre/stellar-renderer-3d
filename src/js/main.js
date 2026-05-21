@@ -367,7 +367,11 @@ function enterComparisonMode() {
   compBtn.style.background = 'rgba(255, 56, 56, 0.15)';
   compBtn.style.borderColor = 'rgba(255, 56, 56, 0.4)';
   compBtn.style.color = '#ff3838';
-  compBtn.setAttribute('aria-pressed', 'true');
+  // Use .active so syncAriaPressed() picks it up. Without this, any later
+  // syncAriaPressed() call would read .active=false and overwrite the manual
+  // aria-pressed back to false.
+  compBtn.classList.add('active');
+  syncAriaPressed();
 
   if (!comparisonGroup) {
     comparisonGroup = new THREE.Group();
@@ -505,7 +509,8 @@ function exitComparisonMode() {
   compBtn.style.background = 'rgba(0, 255, 128, 0.1)';
   compBtn.style.borderColor = 'rgba(0, 255, 128, 0.4)';
   compBtn.style.color = '#00ff80';
-  compBtn.setAttribute('aria-pressed', 'false');
+  compBtn.classList.remove('active');
+  syncAriaPressed();
 
   // Fly camera back to center
   isFlying = true;
