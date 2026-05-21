@@ -188,8 +188,13 @@ function init() {
   // 5. Post-Processing Pipeline Setup (High Quality Bloom)
   const renderPass = new RenderPass(scene, camera);
   
+  // UnrealBloomPass internally rounds resolution.x/y by half for its
+  // render targets (see Math.round(this.resolution.x / 2) in its
+  // constructor). Passing window.innerWidth / 2 here used to double-half
+  // — bloom rendered at quarter resolution. Pass full innerWidth/Height
+  // so the pass's own halving lands at the intended half-res optimization.
   bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), // Half-resolution for 75% GPU fill-rate savings
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
     1.8, // Strength
     0.48, // Radius
     0.88 // Threshold
@@ -1461,10 +1466,13 @@ function onWindowResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   if (composer) {
     composer.setPixelRatio(pixelRatio);
+    // composer.setSize cascades to every pass's setSize, and
+    // UnrealBloomPass.setSize internally does Math.round(w/2). Calling
+    // bloomPass.setSize(w/2, h/2) after this would double-half and render
+    // bloom at quarter-resolution. The pre-resize bloom resolution was set
+    // by the constructor with Vector2(w/2, h/2) — also wrong, but the
+    // composer fixes it the first time it runs setSize for us.
     composer.setSize(window.innerWidth, window.innerHeight);
-  }
-  if (bloomPass) {
-    bloomPass.setSize(window.innerWidth / 2, window.innerHeight / 2);
   }
 }
 
