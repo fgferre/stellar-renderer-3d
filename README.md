@@ -2,7 +2,7 @@
 
 An interactive, physically-grounded WebGL 2 simulation of the Sun and other stellar classes. Procedural surface granulation, magnetic prominences, volumetric coronal streamers, lens flares, auto-exposure bloom, and a side-by-side Comparison Mode covering 12 famous stars from Sirius B to UY Scuti.
 
-🔭 **Live demo:** _will publish when GitHub Pages workflow is enabled_
+🔭 **Live demo:** https://fgferre.github.io/stellar-renderer-3d/
 
 ## Features
 
