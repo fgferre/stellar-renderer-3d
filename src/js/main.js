@@ -663,7 +663,13 @@ function focusOnComparisonStar(index) {
   isFlying = true;
   const starX = star.group.position.x;
   const starScale = star.params.scale;
-  
+
+  // Update the OrbitControls minimum zoom for the new star — in Real scale
+  // mode focused giants need a much larger minDistance or the user could
+  // zoom inside the star body. updateComparisonLayout sets this too but is
+  // not called on a plain focus change.
+  controls.minDistance = 140.0 * starScale;
+
   flightTargetLookAt.set(starX, 0, 0);
   flightTargetPos.set(starX, 180 * starScale, 550 * starScale);
 
