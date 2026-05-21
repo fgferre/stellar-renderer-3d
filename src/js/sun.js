@@ -267,8 +267,10 @@ export class Sun {
 
   updateLensFlares() {
     // Record the inputs that determine flare appearance so applyCurrentParams
-    // can skip the rebuild when nothing relevant changed.
-    this._lastFlareTemp = this.params.highTemp;
+    // can skip the rebuild when nothing relevant changed. Stored as a color
+    // category key (matches the if/else chain below) so intra-bucket
+    // temperature changes are free.
+    this._lastFlareColorKey = this._flareColorKeyForTemp(this.params.highTemp);
     this._lastFlareEnabled = this.params.lensFlaresEnabled;
 
     // Clear existing flare elements. Lensflare.dispose() owns the full
@@ -501,18 +503,31 @@ export class Sun {
     this.coronaMaterial.uniforms.uCoronaDensity.value = this.params.coronaDensity;
     this.coronaMaterial.uniforms.uColorGrading.value = this.params.colorGrading;
 
-    // Flares only depend on highTemp (color category) and lensFlaresEnabled.
-    // Skip the rebuild when neither changed — otherwise every slider drag
-    // (convection, oblateness, etc.) tears down and recreates 3 CanvasTextures
-    // per star × 12 stars in comparison mode.
+    // Flares only depend on the color CATEGORY of highTemp (4 buckets) and
+    // lensFlaresEnabled. Gating on raw temperature still rebuilt 3
+    // CanvasTextures every time a slider dragged within the same bucket
+    // (e.g. 5500K → 5700K). Gate on the category key instead so intra-bucket
+    // drags are free.
+    const colorKey = this._flareColorKeyForTemp(this.params.highTemp);
     if (
-      this._lastFlareTemp !== this.params.highTemp ||
+      this._lastFlareColorKey !== colorKey ||
       this._lastFlareEnabled !== this.params.lensFlaresEnabled
     ) {
-      this._lastFlareTemp = this.params.highTemp;
+      this._lastFlareColorKey = colorKey;
       this._lastFlareEnabled = this.params.lensFlaresEnabled;
       this.updateLensFlares();
     }
+  }
+
+  // Map highTemp to a stable category key matching the if/else chain in
+  // updateLensFlares(). Must stay in sync with that function — changing the
+  // thresholds here without updating updateLensFlares would skip rebuilds
+  // for color changes that actually matter.
+  _flareColorKeyForTemp(highTemp) {
+    if (highTemp > 12000.0) return 'blue';
+    if (highTemp > 8000.0) return 'white';
+    if (highTemp < 4000.0) return 'red';
+    return 'yellow';
   }
 
   // Reset parameters in the active preset slot back to their preset defaults
