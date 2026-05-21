@@ -1010,20 +1010,16 @@ function setupHUDBindings() {
     const rawVal = customInput.value.trim();
     if (!rawVal) return;
 
-    if (isComparisonMode) {
-      exitComparisonMode();
-    }
-    
     // 1. First attempt to search by famous star name in the HYG Database
     let settings = lookupHYGStar(rawVal);
     let isHYG = true;
-    
+
     // 2. If not found in database, fallback to raw Morgan-Keenan spectral parser
     if (!settings) {
       settings = parseMKClassification(rawVal);
       isHYG = false;
     }
-    
+
     if (!settings) {
       // Flash input border red for invalid input feedback
       customInput.style.borderColor = '#ff3838';
@@ -1032,7 +1028,14 @@ function setupHUDBindings() {
       }, 1000);
       return;
     }
-    
+
+    // Only after we know the input is valid: exit comparison mode if active.
+    // Doing this before validation lost the user's comparison context for
+    // typos like "notastar" — the mode flipped, then the red flash showed.
+    if (isComparisonMode) {
+      exitComparisonMode();
+    }
+
     // Clear preset button active states
     presetButtons.forEach(b => b.classList.remove('active'));
     syncAriaPressed();
