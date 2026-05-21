@@ -85,7 +85,6 @@ describe('parseMKClassification', () => {
   it('accepts decimal subclass like O9.5V', () => {
     const o9 = parseMKClassification('O9V');
     const o95 = parseMKClassification('O9.5V');
-    const o10 = parseMKClassification('O10V'); // not valid, regex floors to single digit
     expect(o95).not.toBeNull();
     expect(o95.specClass).toBe('O');
     expect(o95.spect).toBe('O9.5V');
@@ -94,7 +93,31 @@ describe('parseMKClassification', () => {
     // O9.5V → 50000 - 19000 = 31000 → highTemp = 31000 * 1.1
     expect(o95.highTemp).toBeLessThan(o9.highTemp);
     expect(o95.highTemp).toBeCloseTo(31000 * 1.1, 1);
-    expect(o10).toBeNull(); // '10' is two chars — regex expects single digit
+  });
+
+  it('parses multi-digit subclass for white dwarfs (DA10, DA12)', () => {
+    // The regex was widened from [0-9] to [0-9]+ so real cool white dwarfs
+    // like DA10 / DA12 can be entered. T uses the canonical 50400/subclass
+    // formula instead of the old 25000 - subclass*1900 linear ramp.
+    const da10 = parseMKClassification('DA10');
+    const da12 = parseMKClassification('DA12');
+    expect(da10).not.toBeNull();
+    expect(da12).not.toBeNull();
+    expect(da12.highTemp / 1.1).toBeCloseTo(50400 / 12, 0); // ~4200K
+    expect(da10.highTemp).toBeGreaterThan(da12.highTemp);   // hotter
+  });
+
+  it('white dwarfs use degenerate-object radius and derive luminosity from Stefan-Boltzmann', () => {
+    // Pre-fix: every WD got starLum = 0.001 regardless of temperature. Now
+    // R is hardcoded at 0.0084 (Earth-sized, matches Sirius B) and
+    // L = R² (T/T_sun)⁴ — hot DA2 must be far brighter than cool DA9.
+    const da2 = parseMKClassification('DA2');
+    const da9 = parseMKClassification('DA9');
+    expect(da2.lum).toBeGreaterThan(da9.lum);
+    expect(da2.radius).toBeCloseTo(0.0084, 3);
+    // DA2 sanity-check: Sirius B catalog says L = 0.026 L☉.
+    expect(da2.lum).toBeGreaterThan(0.01);
+    expect(da2.lum).toBeLessThan(0.05);
   });
 
   it('returns null for unparseable input', () => {

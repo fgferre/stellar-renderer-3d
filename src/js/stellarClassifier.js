@@ -50,9 +50,11 @@ export function parseMKClassification(spectralString) {
   
   // Regex to extract:
   // 1. Spectral class: O, B, A, F, G, K, M, or white dwarfs DA, DB, DC, DQ, DX
-  // 2. Subclass: 0-9, optionally with one decimal place (e.g. O9.5 for Mintaka)
+  // 2. Subclass: integer (allows multi-digit for white dwarfs like DA10/DA12,
+  //    where the temperature index runs higher than 9) with optional one decimal
+  //    place (e.g. O9.5 for Mintaka).
   // 3. Luminosity Class: Ia, Ib, I, II, III, IV, V, VI, VII (optional, default to V)
-  const regex = /^([OBAFGKM]|D[ABCOQXY])([0-9](?:\.[0-9])?)?(I[AB]|I{1,3}|IV|V|VI|VII)?$/;
+  const regex = /^([OBAFGKM]|D[ABCOQXY])([0-9]+(?:\.[0-9])?)?(I[AB]|I{1,3}|IV|V|VI|VII)?$/;
   const match = cleanStr.match(regex);
 
   if (!match) return null;
@@ -95,10 +97,14 @@ export function parseMKClassification(spectralString) {
     // 2,400K to 3,700K
     baseTemp = 3700 - (subclass * 130);
   } else if (specClass.startsWith('D')) {
-    // White dwarfs: 6,000K to 25,000K
-    baseTemp = 25000 - (subclass * 1900);
+    // White dwarfs use the canonical T = 50400 / subclass formula instead of
+    // a linear ramp. Real DA2 (Sirius B) is ~25200 K; DA9 ~5600 K. Linear
+    // 25000 - subclass*1900 used to give DA9 = 7900 K, which the picker
+    // rendered closer to A-class than to its true cool surface.
+    // Default subclass 5 (for input "DA" alone) yields 10080 K — plausible.
+    baseTemp = 50400 / Math.max(0.5, subclass);
   }
-  
+
   // Sane bounds
   baseTemp = Math.max(2000.0, Math.min(50000.0, baseTemp));
   
@@ -134,13 +140,22 @@ export function parseMKClassification(spectralString) {
     starLum = Math.max(500.0, Math.pow(mass, 3.5) * 8.0);
   } else if (lumClass === 'III') {
     starLum = Math.max(50.0, Math.pow(mass, 3.5) * 5.0);
-  } else if (lumClass === 'VII' || specClass.startsWith('D')) {
-    starLum = 0.001; // Extremely dim white dwarfs
   }
 
   // Calculate Radius using Stefan-Boltzmann: R = sqrt(L) / (T / 5778)^2
   let radius = Math.sqrt(starLum) / Math.pow(baseTemp / 5778.0, 2);
   radius = Math.max(0.008, radius);
+
+  // White dwarfs are degenerate compact objects: radius is set by electron
+  // degeneracy pressure, not the L/T main-sequence relation above. Hardcode
+  // ~Earth-sized (0.0084 R☉ matches Sirius B) and derive luminosity from
+  // Stefan-Boltzmann L = R² * (T/T_sun)⁴ instead. The previous code stamped
+  // L = 0.001 regardless of temperature, so hot DA2 (Sirius B) and cool DA9
+  // were equally bright at L = 0.001 L☉.
+  if (lumClass === 'VII' || specClass.startsWith('D')) {
+    radius = 0.0084;
+    starLum = radius * radius * Math.pow(baseTemp / 5778.0, 4);
+  }
 
   // Estimate Rotational Velocity (v sin i) in km/s
   let vRot = 2.0;
