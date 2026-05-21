@@ -1343,6 +1343,12 @@ function animate() {
   const simDelta = Math.min(delta, 0.1) * timeSpeed;
   simTime += simDelta;
   const elapsed = simTime;
+  // Float precision in sin(uTime * f) degrades as uTime grows. After a few
+  // hours of runtime, twinkle/convection patterns visibly jitter. Wrap to a
+  // 1-hour window: every animation in our shaders is periodic at frequencies
+  // below ~3 Hz, so 3600s contains many full cycles and the wrap-around is
+  // imperceptible. simTime itself stays unwrapped for any non-shader use.
+  const shaderTime = elapsed % 3600;
 
   // 1. Process flight autopilot or cinematic camera
   if (isCinematicMode) {
@@ -1462,13 +1468,13 @@ function animate() {
     }
 
     comparisonStars.forEach(star => {
-      star.update(elapsed);
+      star.update(shaderTime);
     });
   } else {
-    sun.update(elapsed);
+    sun.update(shaderTime);
   }
   if (starfield) {
-    starfield.material.uniforms.uTime.value = elapsed;
+    starfield.material.uniforms.uTime.value = shaderTime;
   }
 
   // 5. Update HTML 3D labels positioning
