@@ -507,9 +507,15 @@ void main() {
   
   vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
   gl_Position = projectionMatrix * mvPosition;
-  
-  // Size attenuation with distance
-  gl_PointSize = aSize * (50000.0 / max(-mvPosition.z, 0.1));
+
+  // Size attenuation with true camera distance, not just forward depth.
+  // The starfield is recentered on the camera each frame, so all stars sit
+  // on a ~25-35k shell and should appear roughly the same size. Using
+  // -mvPosition.z made side-horizon stars (where z approaches 0) blow up to
+  // ~500000x their attribute size. length(mvPosition.xyz) keeps the size
+  // angular and the explicit clamp caps any remaining edge case.
+  float dist = length(mvPosition.xyz);
+  gl_PointSize = clamp(aSize * (50000.0 / max(dist, 100.0)), 1.0, 100.0);
 }
 `;
 
